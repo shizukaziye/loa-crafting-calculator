@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang='en'><head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Lost Ark Crafting Profit Calculator</title>
+<!-- SELF-CONTAINED: all CSS + JS inline, no build step, no deps. Deploys to GitHub Pages as-is.
+     Engine is a faithful port of loa-buddy.pages.dev's verified profit math, plus two meals it lacks. -->
+<style>
+:root{
+  --bg:#0d1017;--panel:#161a24;--panel2:#1b2030;--border:#2a3142;--text:#e7e9ee;
+  --dim:#97a0b4;--accent:#66c7ff;--high:#ffb86b;--mid:#c78cff;--low:#6ad4ff;
+  --none:#4f5666;--useless:#707788;--good:#6ee7a8;--bad:#ff7f7f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text)}
+body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:24px 18px 80px}
+h1{font-size:25px;margin:0 0 4px;letter-spacing:-.02em}
+.tag{color:var(--dim);font-size:13px;margin-bottom:18px}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);margin:26px 0 10px;font-weight:700}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.panel+.panel{margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 9px;text-align:left;border-bottom:1px solid var(--border)}
+th{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.good{color:var(--good)}.bad{color:var(--bad)}.accent{color:var(--accent)}.dim{color:var(--dim)}
+code,.mono{font-family:"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;font-size:12px}
+.formula{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;overflow-x:auto;white-space:pre}
+.grid{display:grid;gap:12px}
+.inputs{position:sticky;top:0;z-index:20;background:rgba(13,16,23,.97);
+  border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:6px;backdrop-filter:blur(6px)}
+.ihdr{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;user-select:none;margin-bottom:10px}
+.ihdr .tgl{cursor:pointer}
+.ihdr #caret{display:inline-block;width:12px}
+.ig{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px 14px}
+.fld{display:flex;flex-direction:column;gap:2px}
+.fld label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.fld input{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:13px;font-family:inherit;width:100%}
+.fld input:disabled{color:var(--accent);opacity:1;cursor:not-allowed;border-style:dashed}
+.fld input:focus{outline:1px solid var(--accent)}
+.subh{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:700;margin:12px 0 6px}
+.barrow{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+button{background:var(--accent);color:#06121f;border:none;border-radius:7px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+button:hover{filter:brightness(1.08)}
+.mbtn{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--dim)}
+.mbtn.active{color:#06121f;background:var(--accent)}
+.note{color:var(--dim);font-size:11px;margin-top:6px}
+.redux{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.redux .rc{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px}
+.redux .rc h4{margin:0 0 8px;font-size:12px;color:var(--text)}
+.redux .rc .fld{margin-bottom:6px}
+.toprow{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.toprow .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-right:4px}
+tr.click{cursor:pointer}
+tr.click:hover{background:var(--panel2)}
+tr.sel{background:#22304a}
+th.so{cursor:pointer}th.so:hover{color:var(--text)}
+th.so.act{color:var(--accent)}
+.pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.04em}
+.pill.cooking{background:#3a2a16;color:var(--high)}
+.pill.special{background:#2a2140;color:var(--mid)}
+.pill.battle{background:#10303a;color:var(--low)}
+.big{font-size:15px}
+.hl{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;font-size:14px}
+.warn{color:var(--high)}
+details.method{margin-top:26px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px 16px}
+details.method summary{cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);font-weight:700;padding:8px 0}
+details.method p,details.method li{font-size:13px;color:var(--text)}
+details.prices{margin-top:12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:4px 12px}
+details.prices summary{cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;padding:6px 0}
+@media(max-width:760px){.redux{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head><body>
+<div class='wrap'>
+  <h1>Lost Ark Stronghold Crafting &mdash; Profit Calculator</h1>
+  <div class='tag'>Net gold per craft / per hour / ROI for every craftable, ranked. Sells on the market with a 5% tax (rounded up); mats valued at market buy price. Faithful port of loa-buddy's engine + two meals it doesn't have.</div>
+
+  <!-- INPUTS: sticky, collapsible, default collapsed -->
+  <div class='inputs'>
+    <div class='ihdr'>
+      <span class='tgl' onclick='toggleInputs()'><span id='caret'>&#9662;</span> Inputs &amp; reductions</span>
+      <span id='syncStatus' class='note' style='margin:0'></span>
+    </div>
+    <div id='infields'>
+      <div class='toprow'>
+        <span><span class='lbl'>Region</span>
+          <button class='mbtn active' data-rg='nae' onclick='setRegion("nae")'>NA East</button>
+          <button class='mbtn' data-rg='euc' onclick='setRegion("euc")'>EU Central</button></span>
+        <span><span class='lbl'>Great Success</span>
+          <button class='mbtn active' id='gsBtn' onclick='toggleGS()'>On</button></span>
+        <span><button onclick='syncPrices()'>&#8635; Sync live prices</button></span>
+      </div>
+
+      <div class='subh'>Crafting Reductions (%) &mdash; General stacks onto the category-specific column</div>
+      <div class='redux'>
+        <div class='rc'><h4>General</h4>
+          <div class='fld'><label>Cost</label><input id='r_general_cost' type='number' step='1'></div>
+          <div class='fld'><label>Time</label><input id='r_general_time' type='number' step='1'></div>
+          <div class='fld'><label>Great Success</label><input id='r_general_gs' type='number' step='1'></div></div>
+        <div class='rc'><h4>Battle</h4>
+          <div class='fld'><label>Cost</label><input id='r_battle_cost' type='number' step='1'></div>
+          <div class='fld'><label>Time</label><input id='r_battle_time' type='number' step='1'></div>
+          <div class='fld'><label>Great Success</label><input id='r_battle_gs' type='number' step='1'></div></div>
+        <div class='rc'><h4>Cooking</h4>
+          <div class='fld'><label>Cost</label><input id='r_cooking_cost' type='number' step='1'></div>
+          <div class='fld'><label>Time</label><input id='r_cooking_time' type='number' step='1'></div>
+          <div class='fld'><label>Great Success</label><input id='r_cooking_gs' type='number' step='1'></div></div>
+        <div class='rc'><h4>Special (fusion)</h4>
+          <div class='fld'><label>Cost</label><input id='r_special_cost' type='number' step='1'></div>
+          <div class='fld'><label>Time</label><input id='r_special_time' type='number' step='1'></div>
+          <div class='fld'><label>Great Success</label><input id='r_special_gs' type='number' step='1'></div></div>
+      </div>
+
+      <details class='prices'>
+        <summary id='pxSummary'>Market prices (editable)</summary>
+        <div class='note' style='margin:2px 0 8px'>Per <b>bundle</b> as listed on the auction house (gathered mats = per 100, crafted items = per 1). Edit any cell to override; "Sync live prices" refills from the market.</div>
+        <div class='subh'>Gathered materials (per 100)</div>
+        <div class='ig' id='pxRaw'></div>
+        <div class='subh'>Crafted items &amp; outputs (per 1)</div>
+        <div class='ig' id='pxCraft'></div>
+      </details>
+
+      <div class='subh'>Live-sync proxy (optional)</div>
+      <div class='ig' style='grid-template-columns:1fr'>
+        <div class='fld'><label>Proxy URL &mdash; paste your CORS worker to enable in-browser "Sync live prices" (see Methodology). Leave blank to use the baked snapshot or edit prices by hand.</label><input id='p_proxy' type='text' placeholder='https://your-worker.workers.dev/v1/prices/latest'></div>
+      </div>
+
+      <div class='barrow'>
+        <button onclick='recalc()'>Recalculate</button>
+        <button onclick='resetDefaults();recalc()' style='background:var(--panel2);color:var(--text)'>Reset reductions</button>
+      </div>
+    </div>
+  </div>
+
+  <h2>Best craft right now</h2>
+  <div class='hl' id='summary'></div>
+
+  <h2>All crafts &mdash; ranked</h2>
+  <div class='toprow' style='margin:0 0 8px'>
+    <span><span class='lbl'>Show</span>
+      <button class='mbtn active' data-ft='all' onclick='setFilter("all")'>All</button>
+      <button class='mbtn' data-ft='cooking' onclick='setFilter("cooking")'>Cooking</button>
+      <button class='mbtn' data-ft='special' onclick='setFilter("special")'>Fusion</button>
+      <button class='mbtn' data-ft='battle' onclick='setFilter("battle")'>Battle</button></span>
+    <span class='note' style='margin:0'>Click a row for the full material breakdown.</span>
+  </div>
+  <div class='panel'><table id='table'></table></div>
+
+  <div id='breakdown'></div>
+
+  <details class='method'>
+    <summary>Methodology &amp; setup</summary>
+    <p>Every number is recomputed in your browser from the reductions above and current market prices. The engine mirrors <b>loa-buddy.pages.dev</b> exactly (verified against its code), so results match the tool you already trust.</p>
+    <div class='formula'>adjustedGold = floor( craftingCost x (1 - (general.cost + category.cost)/100) )
+adjustedTime = craftingTime x (1 - (general.time + category.time)/100)
+GSC (great success chance) = enabled ? 5 x (1 + (general.GS + category.GS)/100) : 0
+EY  (expected yield)       = baseQuantity x (1 + GSC/100)
+materialCost = SUM  qty x (marketPrice / bundleSize)      (cheapest gathering path is auto-picked)
+totalCost    = materialCost + adjustedGold
+tax          = sellPrice &lt;= 1 ? 0 : ceil(sellPrice x 0.05)      (5%, rounded UP to nearest gold)
+NET PROFIT / craft = EY x (sellPrice - tax) - totalCost
+NET / hour = netProfit / (adjustedTime / 60)
+ROI %      = netProfit / totalCost</div>
+    <ul>
+      <li><b>Great Success</b> doubles a craft's output, and happens <code>GSC%</code> of the time &mdash; that's why expected yield is <code>qty x (1 + GSC/100)</code>. The "x2" badge in-game refers to this doubling. Toggle it off to see worst-case.</li>
+      <li><b>Cheapest path:</b> fusion materials can be made from several gathering types (Fishing / Hunting / Mining...). The tool prices each path and uses the cheapest; the chosen one shows in the Path column.</li>
+      <li><b>Mats are valued at market buy price</b> (true opportunity cost). If you farm a mat yourself, edit its price toward 0 to see your effective profit.</li>
+      <li><b>Two added meals</b> (Virtuoso's Striploin, Specialist's Beef Tenderloin) aren't in loa-buddy. Their recipes are entered from in-game. <span class='warn'>Their craft times are assumed (75 / 60 min) &mdash; confirm them in-game; this only affects the per-hour column, not per-craft.</span></li>
+      <li><b>Prices</b> come from the same market feed loa-buddy uses, baked in as a snapshot. The timestamp is shown in the price panel.</li>
+    </ul>
+    <p><b>Enable one-click live sync (optional).</b> The market API only answers loa-buddy's own domain (CORS), so this page can't call it directly. Deploy this ~20-line Cloudflare Worker (free), then paste its URL into the Proxy field above:</p>
+    <div class='formula'>// worker.js  -- deploy at dash.cloudflare.com &gt; Workers &gt; Create
+export default {
+  async fetch(req) {
+    const cors = { "Access-Control-Allow-Origin": "*",
+                   "Access-Control-Allow-Methods": "POST,OPTIONS",
+                   "Access-Control-Allow-Headers": "Content-Type" };
+    if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+    const body = await req.text();
+    const r = await fetch("https://marketdata-api.yrzhao1068589.workers.dev/v1/prices/latest",
+      { method: "POST", headers: { "Content-Type": "application/json" }, body });
+    return new Response(await r.text(),
+      { headers: { ...cors, "Content-Type": "application/json" } });
+  }
+};</div>
+  </details>
+</div>
+
+<script>
+"use strict";
+// ====== embedded data (recipes, item catalog, baked price snapshot) ======
+const RECIPES=[{"id":"superior_abidos_fusion_material","name":"Superior Abidos Fusion Material","type":"special","craftingCost":520,"quantity":10,"craftingTime":75,"materialOptions":[{"category":"Fishing","items":[{"id":"fish","quantity":112},{"id":"redflesh_fish","quantity":59},{"id":"abidos_solar_carp","quantity":43}]},{"category":"Hunting","items":[{"id":"thick_raw_meat","quantity":112},{"id":"treated_meat","quantity":59},{"id":"abidos_thick_raw_meat","quantity":43}]},{"category":"Excavating","items":[{"id":"ancient_relic","quantity":112},{"id":"rare_relic","quantity":59},{"id":"abidos_relic","quantity":43}]},{"category":"Foraging","items":[{"id":"wild_flower","quantity":112},{"id":"shy_wild_flower","quantity":59},{"id":"abidos_wild_flower","quantity":43}]},{"category":"Logging","items":[{"id":"timber","quantity":112},{"id":"tender_timber","quantity":59},{"id":"abidos_timber","quantity":43}]},{"category":"Mining","items":[{"id":"iron_ore","quantity":112},{"id":"heavy_iron_ore","quantity":59},{"id":"abidos_iron_ore","quantity":43}]}]},{"id":"abidos_fusion_material","name":"Abidos Fusion Material","type":"special","craftingCost":400,"quantity":10,"craftingTime":60,"materialOptions":[{"category":"Fishing","items":[{"id":"fish","quantity":86},{"id":"redflesh_fish","quantity":45},{"id":"abidos_solar_carp","quantity":33}]},{"category":"Hunting","items":[{"id":"thick_raw_meat","quantity":86},{"id":"treated_meat","quantity":45},{"id":"abidos_thick_raw_meat","quantity":33}]},{"category":"Excavating","items":[{"id":"ancient_relic","quantity":86},{"id":"rare_relic","quantity":45},{"id":"abidos_relic","quantity":33}]},{"category":"Foraging","items":[{"id":"wild_flower","quantity":86},{"id":"shy_wild_flower","quantity":45},{"id":"abidos_wild_flower","quantity":33}]},{"category":"Logging","items":[{"id":"timber","quantity":86},{"id":"tender_timber","quantity":45},{"id":"abidos_timber","quantity":33}]},{"category":"Mining","items":[{"id":"iron_ore","quantity":86},{"id":"heavy_iron_ore","quantity":45},{"id":"abidos_iron_ore","quantity":33}]}]},{"id":"prime_oreha_fusion_material","name":"Prime Oreha Fusion Material","type":"special","craftingCost":300,"quantity":15,"craftingTime":75,"materialOptions":[{"category":"Fishing","items":[{"id":"fish","quantity":142},{"id":"redflesh_fish","quantity":69},{"id":"oreha_solar_carp","quantity":52}]},{"category":"Excavating","items":[{"id":"ancient_relic","quantity":107},{"id":"rare_relic","quantity":51},{"id":"oreha_relic","quantity":52}]},{"category":"Hunting","items":[{"id":"thick_raw_meat","quantity":142},{"id":"treated_meat","quantity":69},{"id":"oreha_thick_meat","quantity":52}]}]},{"id":"superior_oreha_fusion_material","name":"Superior Oreha Fusion Material","type":"special","craftingCost":250,"quantity":20,"craftingTime":60,"materialOptions":[{"category":"Hunting","items":[{"id":"oreha_thick_meat","quantity":16},{"id":"treated_meat","quantity":64},{"id":"thick_raw_meat","quantity":128}]},{"category":"Fishing","items":[{"id":"oreha_solar_carp","quantity":16},{"id":"redflesh_fish","quantity":64},{"id":"fish","quantity":128}]},{"category":"Excavating","items":[{"id":"oreha_relic","quantity":16},{"id":"rare_relic","quantity":29},{"id":"ancient_relic","quantity":94}]}]},{"id":"oreha_fusion_material","name":"Oreha Fusion Material","type":"special","craftingCost":205,"quantity":30,"craftingTime":45,"materialOptions":[{"category":"Hunting","items":[{"id":"oreha_thick_meat","quantity":10},{"id":"treated_meat","quantity":40},{"id":"thick_raw_meat","quantity":80}]},{"category":"Fishing","items":[{"id":"oreha_solar_carp","quantity":10},{"id":"redflesh_fish","quantity":40},{"id":"fish","quantity":80}]},{"category":"Excavating","items":[{"id":"oreha_relic","quantity":8},{"id":"rare_relic","quantity":26},{"id":"ancient_relic","quantity":64}]}]},{"id":"atropine_potion","name":"Atropine Potion","type":"battle","craftingCost":30,"quantity":3,"craftingTime":60,"materialOptions":[{"category":"default","items":[{"id":"exotic_relic","quantity":6},{"id":"rare_relic","quantity":17},{"id":"shy_wild_flower","quantity":8},{"id":"ancient_relic","quantity":75}]}]},{"id":"stimulant","name":"Stimulant","type":"battle","craftingCost":30,"quantity":3,"craftingTime":60,"materialOptions":[{"category":"default","items":[{"id":"exotic_relic","quantity":8},{"id":"rare_relic","quantity":24},{"id":"ancient_relic","quantity":32}]}]},{"id":"elemental_hp_potion","name":"Elemental HP Potion","type":"battle","craftingCost":30,"quantity":3,"craftingTime":60,"materialOptions":[{"category":"default","items":[{"id":"bright_wild_flower","quantity":8},{"id":"shy_wild_flower","quantity":25},{"id":"wild_flower","quantity":33}]}]},{"id":"splendid_elemental_hp_potion","name":"Splendid Elemental HP Potion","type":"battle","craftingCost":30,"quantity":2,"craftingTime":75,"materialOptions":[{"category":"default","items":[{"id":"elemental_hp_potion","quantity":3},{"id":"bright_wild_flower","quantity":8}]}]},{"id":"dark_grenade","name":"Dark Grenade","type":"battle","craftingCost":15,"quantity":3,"craftingTime":30,"materialOptions":[{"category":"default","items":[{"id":"sturdy_timber","quantity":4},{"id":"tender_timber","quantity":12},{"id":"timber","quantity":17}]}]},{"id":"splendid_dark_grenade","name":"Splendid Dark Grenade","type":"battle","craftingCost":15,"quantity":2,"craftingTime":45,"materialOptions":[{"category":"default","items":[{"id":"dark_grenade","quantity":3},{"id":"sturdy_timber","quantity":4}]}]},{"id":"sacred_bomb","name":"Sacred Bomb","type":"battle","craftingCost":15,"quantity":3,"craftingTime":30,"materialOptions":[{"category":"default","items":[{"id":"strong_iron_ore","quantity":4},{"id":"heavy_iron_ore","quantity":15},{"id":"iron_ore","quantity":30}]}]},{"id":"splendid_sacred_bomb","name":"Splendid Sacred Bomb","type":"battle","craftingCost":15,"quantity":2,"craftingTime":45,"materialOptions":[{"category":"default","items":[{"id":"sacred_bomb","quantity":3},{"id":"strong_iron_ore","quantity":4}]}]},{"id":"masters_chewy_grilled","name":"Master's Chewy Grilled Skewers","type":"cooking","quantity":1,"craftingTime":45,"craftingCost":35,"materialOptions":[{"category":"default","items":[{"id":"oreha_thick_meat","quantity":6},{"id":"oreha_solar_carp","quantity":7},{"id":"treated_meat","quantity":22},{"id":"redflesh_fish","quantity":26},{"id":"thick_raw_meat","quantity":45},{"id":"fish","quantity":53}]}]},{"id":"masters_herb_steak","name":"Master's Herb Steak Meal","type":"cooking","quantity":1,"craftingTime":60,"craftingCost":50,"materialOptions":[{"category":"default","items":[{"id":"oreha_thick_meat","quantity":12},{"id":"oreha_solar_carp","quantity":13},{"id":"treated_meat","quantity":44},{"id":"redflesh_fish","quantity":50},{"id":"thick_raw_meat","quantity":88},{"id":"fish","quantity":100}]}]},{"id":"sacred_charm","name":"Sacred Charm","type":"battle","craftingCost":15,"quantity":3,"craftingTime":30,"materialOptions":[{"category":"default","items":[{"id":"strong_iron_ore","quantity":4},{"id":"heavy_iron_ore","quantity":14},{"id":"iron_ore","quantity":28}]}]},{"id":"splendid_sacred_charm","name":"Splendid Sacred Charm","type":"battle","craftingCost":15,"quantity":2,"craftingTime":45,"materialOptions":[{"category":"default","items":[{"id":"sacred_charm","quantity":3},{"id":"strong_iron_ore","quantity":4}]}]},{"id":"virtuoso_striploin","name":"Virtuoso's Striploin Steak Meal","type":"cooking","craftingCost":80,"quantity":1,"craftingTime":75,"timeAssumed":true,"materialOptions":[{"category":"default","items":[{"id":"abidos_thick_raw_meat","quantity":65},{"id":"abidos_solar_carp","quantity":75},{"id":"treated_meat","quantity":84},{"id":"redflesh_fish","quantity":97},{"id":"thick_raw_meat","quantity":112},{"id":"fish","quantity":129}]}]},{"id":"specialist_beef","name":"Specialist's Beef Tenderloin Steak Meal","type":"cooking","craftingCost":65,"quantity":1,"craftingTime":60,"timeAssumed":true,"materialOptions":[{"category":"default","items":[{"id":"oreha_thick_meat","quantity":53},{"id":"oreha_solar_carp","quantity":60},{"id":"treated_meat","quantity":68},{"id":"redflesh_fish","quantity":77},{"id":"thick_raw_meat","quantity":90},{"id":"fish","quantity":103}]}]}];
+const ITEMS={"masters_herb_steak":{"slug":"masters-herb-steak","name":"Master's Herb Steak Meal","bundle":1},"stimulant":{"slug":"stimulant","name":"Stimulant","bundle":1},"atropine_potion":{"slug":"atropine-potion","name":"Atropine Potion","bundle":1},"timber":{"slug":"timber","name":"Timber","bundle":100},"oreha_relic":{"slug":"oreha-relic","name":"Oreha Relic","bundle":100},"bright_wild_flower":{"slug":"bright-wild-flower","name":"Bright Wild Flower","bundle":100},"specialist_beef":{"slug":"specialist-beef","name":"Specialist Beef Tenderloin Steak Meal","bundle":1},"strong_iron_ore":{"slug":"strong-iron-ore","name":"Strong Iron Ore","bundle":100},"treated_meat":{"slug":"treated-meat","name":"Treated Meat","bundle":100},"prime_oreha_fusion_material":{"slug":"prime-oreha-fusion-material","name":"Prime Oreha Fusion Material","bundle":1},"splendid_sacred_bomb":{"slug":"splendid-sacred-bomb","name":"Splendid Sacred Bomb","bundle":1},"splendid_sacred_charm":{"slug":"splendid-sacred-charm","name":"Splendid Sacred Charm","bundle":1},"heavy_iron_ore":{"slug":"heavy-iron-ore","name":"Heavy Iron Ore","bundle":100},"tender_timber":{"slug":"tender-timber","name":"Tender Timber","bundle":100},"oreha_thick_meat":{"slug":"oreha-thick-meat","name":"Oreha Thick Meat","bundle":100},"exotic_relic":{"slug":"exotic-relic","name":"Exotic Relic","bundle":100},"fish":{"slug":"fish","name":"Fish","bundle":100},"sacred_bomb":{"slug":"sacred-bomb","name":"Sacred Bomb","bundle":1},"thick_raw_meat":{"slug":"thick-raw-meat","name":"Thick Raw Meat","bundle":100},"dark_grenade":{"slug":"dark-grenade","name":"Dark Grenade","bundle":1},"abidos_relic":{"slug":"abidos-relic","name":"Abidos Relic","bundle":100},"elemental_hp_potion":{"slug":"elemental-hp-potion","name":"Elemental HP Potion","bundle":1},"superior_abidos_fusion_material":{"slug":"superior-abidos-fusion-material","name":"Superior Abidos Fusion Material","bundle":1},"oreha_solar_carp":{"slug":"oreha-solar-carp","name":"Oreha Solar Carp","bundle":100},"abidos_solar_carp":{"slug":"abidos-solar-carp","name":"Abidos Solar Carp","bundle":100},"abidos_fusion_material":{"slug":"abidos-fusion-material","name":"Abidos Fusion Material","bundle":1},"superior_oreha_fusion_material":{"slug":"superior-oreha-fusion-material","name":"Superior Oreha Fusion Material","bundle":1},"redflesh_fish":{"slug":"redflesh-fish","name":"Redflesh Fish","bundle":100},"rare_relic":{"slug":"rare-relic","name":"Rare Relic","bundle":100},"abidos_wild_flower":{"slug":"abidos-wild-flower","name":"Abidos Wild Flower","bundle":100},"sacred_charm":{"slug":"sacred-charm","name":"Sacred Charm","bundle":1},"splendid_elemental_hp_potion":{"slug":"splendid-elemental-hp-potion","name":"Splendid Elemental HP Potion","bundle":1},"ancient_relic":{"slug":"ancient-relic","name":"Ancient Relic","bundle":100},"shy_wild_flower":{"slug":"shy-wild-flower","name":"Shy Wild Flower","bundle":100},"sturdy_timber":{"slug":"sturdy-timber","name":"Sturdy Timber","bundle":100},"virtuoso_striploin":{"slug":"virtuoso-striploin","name":"Virtuoso Striploin Steak Meal","bundle":1},"masters_chewy_grilled":{"slug":"masters-chewy-grilled","name":"Master's Chewy Grilled Skewers","bundle":1},"abidos_iron_ore":{"slug":"abidos-iron-ore","name":"Abidos Iron Ore","bundle":100},"oreha_fusion_material":{"slug":"oreha-fusion-material","name":"Oreha Fusion Material","bundle":1},"wild_flower":{"slug":"wild-flower","name":"Wild Flower","bundle":100},"abidos_thick_raw_meat":{"slug":"abidos-thick-raw-meat","name":"Abidos Thick Raw Meat","bundle":100},"iron_ore":{"slug":"iron-ore","name":"Iron Ore","bundle":100},"abidos_timber":{"slug":"abidos-timber","name":"Abidos Timber","bundle":100},"splendid_dark_grenade":{"slug":"splendid-dark-grenade","name":"Splendid Dark Grenade","bundle":1}};
+const SNAPSHOT={"nae":{"abidos-fusion-material":129,"abidos-iron-ore":1615,"abidos-relic":1418,"abidos-solar-carp":1847,"abidos-thick-raw-meat":2140,"abidos-timber":1590,"abidos-wild-flower":1300,"ancient-relic":332,"atropine-potion":159,"bright-wild-flower":2300,"dark-grenade":95,"elemental-hp-potion":193,"exotic-relic":3,"fish":153,"heavy-iron-ore":456,"iron-ore":210,"masters-chewy-grilled":1022,"masters-herb-steak":2988,"oreha-fusion-material":1,"oreha-relic":1090,"oreha-solar-carp":66,"oreha-thick-meat":2590,"prime-oreha-fusion-material":59,"rare-relic":434,"redflesh-fish":257,"sacred-bomb":150,"sacred-charm":94,"shy-wild-flower":530,"specialist-beef":2090,"splendid-dark-grenade":253,"splendid-elemental-hp-potion":426,"splendid-sacred-bomb":280,"splendid-sacred-charm":278,"stimulant":108,"strong-iron-ore":1586,"sturdy-timber":1297,"superior-abidos-fusion-material":167,"superior-oreha-fusion-material":45,"tender-timber":309,"thick-raw-meat":252,"timber":150,"treated-meat":450,"virtuoso-striploin":5891,"wild-flower":180},"euc":{"abidos-fusion-material":140,"abidos-iron-ore":2095,"abidos-relic":2088,"abidos-solar-carp":1988,"abidos-thick-raw-meat":2698,"abidos-timber":2030,"abidos-wild-flower":1898,"ancient-relic":248,"atropine-potion":173,"bright-wild-flower":2034,"dark-grenade":112,"elemental-hp-potion":218,"exotic-relic":4,"fish":288,"heavy-iron-ore":327,"iron-ore":181,"masters-chewy-grilled":1217,"masters-herb-steak":2167,"oreha-fusion-material":6,"oreha-relic":1990,"oreha-solar-carp":329,"oreha-thick-meat":3399,"prime-oreha-fusion-material":87,"rare-relic":370,"redflesh-fish":377,"sacred-bomb":131,"sacred-charm":117,"shy-wild-flower":564,"specialist-beef":2100,"splendid-dark-grenade":388,"splendid-elemental-hp-potion":410,"splendid-sacred-bomb":448,"splendid-sacred-charm":354,"stimulant":100,"strong-iron-ore":1788,"sturdy-timber":1611,"superior-abidos-fusion-material":196,"superior-oreha-fusion-material":12,"tender-timber":329,"thick-raw-meat":369,"timber":164,"treated-meat":519,"virtuoso-striploin":5897,"wild-flower":215}};
+const SNAP_TS=1781857181;
+// ====== helpers ======
+const $=id=>document.getElementById(id);
+const g=v=>Math.round(v).toLocaleString();                       // gold, integer w/ commas
+const sg=v=>(v>=0?'+':'')+g(v);                                  // signed gold
+const pct=v=>(v*100).toFixed(1)+'%';
+const u2=v=>v.toFixed(2);
+const fmtTime=m=>m<60?Math.round(m)+'m':(m/60).toFixed(1)+'h';
+const TYPE={cooking:'Cooking',special:'Fusion',battle:'Battle'};
+// safe localStorage — file:// and some privacy modes throw on access; never let that blank the page
+const LS_get=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
+const LS_set=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+
+// ====== defaults (from the user's reduction screenshot) ======
+const DEFAULTS={
+  general:{cost:7,time:10,gs:5}, battle:{cost:0,time:0,gs:0},
+  cooking:{cost:0,time:0,gs:0},  special:{cost:10,time:0,gs:9}
+};
+
+// ====== MODEL: pure functions, no DOM. (mirrors loa-buddy; mirrored in ref.py) ======
+function adjGold(r,R){ const c=R.general.cost+(R[r.type]?R[r.type].cost:0); return Math.floor(r.craftingCost*(1-c/100)); }
+function adjTime(r,R){ const t=R.general.time+(R[r.type]?R[r.type].time:0); return r.craftingTime*(1-t/100); } // minutes
+function gscOf(r,R,enable){ if(!enable) return 0; const x=R.general.gs+(R[r.type]?R[r.type].gs:0); return 5*(1+x/100); }
+function taxOf(p){ return p<=1?0:Math.ceil(p*0.05); }
+function unitPrice(id,prices){ const m=ITEMS[id]; return (prices[m.slug]||0)/m.bundle; }
+function optionCost(opt,prices){ let s=0; for(const it of opt.items) s+=it.quantity*unitPrice(it.id,prices); return s; }
+function bestOption(r,prices){ let best=null; for(const o of r.materialOptions){ const c=optionCost(o,prices); if(best===null||c<best.cost) best={cat:o.category,cost:c,opt:o}; } return best; }
+function evalRecipe(r,prices,R,enable){
+  const gold=adjGold(r,R), bo=bestOption(r,prices), total=bo.cost+gold;
+  const GSC=gscOf(r,R,enable), EY=r.quantity*(1+GSC/100);
+  const sell=prices[ITEMS[r.id].slug]||0, tax=taxOf(sell), revenue=EY*(sell-tax);
+  const net=revenue-total, time=adjTime(r,R);
+  return { gold, path:bo.cat, matCost:bo.cost, total, GSC, EY, sell, tax, revenue, net,
+           time, perHr: time>0?net/(time/60):0, roi: total>0?net/total:0 };
+}
+
+// ====== state + lifecycle ======
+let P=null, PRICES={}, curRegion='nae', enableGS=true, curFilter='all',
+    sortKey='net', sortDir=-1, selId=null, inputsCollapsed=false;
+
+function setDefaultsToInputs(){
+  for(const cat of ['general','battle','cooking','special'])
+    for(const k of [['cost','cost'],['time','time'],['gs','gs']])
+      $('r_'+cat+'_'+k[0]).value=DEFAULTS[cat][k[1]];
+}
+function resetDefaults(){ setDefaultsToInputs(); }
+
+function readParams(){
+  const rd=c=>({cost:+$('r_'+c+'_cost').value||0, time:+$('r_'+c+'_time').value||0, gs:+$('r_'+c+'_gs').value||0});
+  P={ R:{general:rd('general'),battle:rd('battle'),cooking:rd('cooking'),special:rd('special')}, enable:enableGS };
+}
+
+function computeAll(){ return RECIPES.map(r=>({r, e:evalRecipe(r,PRICES,P.R,P.enable)})); }
+
+function recalc(){
+  readParams();
+  const rows=computeAll();
+  renderSummary(rows);
+  renderTable(rows);
+  if(selId) renderBreakdown(selId);
+}
+
+// ====== render ======
+function renderSummary(rows){
+  const best=rows.slice().sort((a,b)=>b.e.net-a.e.net)[0];
+  const bestHr=rows.slice().sort((a,b)=>b.e.perHr-a.e.perHr)[0];
+  const prof=rows.filter(x=>x.e.net>0).length;
+  const r=best.r,e=best.e;
+  let h=`<div class='big'>Top profit / craft: <b class='accent'>${r.name}</b> &mdash; <b class='${e.net>=0?'good':'bad'}'>${sg(e.net)} gold</b> per craft `+
+        `<span class='dim'>(${sg(e.perHr)}/hr, ${pct(e.roi)} ROI)</span></div>`;
+  if(bestHr.r.id!==r.id) h+=`<div class='note'>Best per <b>hour</b>: <b class='accent'>${bestHr.r.name}</b> at <b class='good'>${sg(bestHr.e.perHr)}/hr</b> (${sg(bestHr.e.net)}/craft).</div>`;
+  h+=`<div class='note'>${prof} of ${rows.length} crafts profitable to sell &middot; region <b>${curRegion.toUpperCase()}</b> &middot; mats at market buy price${P.enable?'':' &middot; great success OFF'}.</div>`;
+  $('summary').innerHTML=h;
+}
+
+const COLS=[
+  ['name','Recipe',false],['type','Type',false],['path','Path',false],
+  ['matCost','Mat cost',true],['gold','Gold',true],['total','Total cost',true],
+  ['EY','Yield',true],['sell','Sells @',true],['net','Net / craft',true],
+  ['perHr','Net / hr',true],['roi','ROI',true]
+];
+function sortBy(k){ if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=(k==='name'||k==='type'||k==='path')?1:-1; } recalc(); }
+function renderTable(rows){
+  let view=rows.filter(x=>curFilter==='all'||x.r.type===curFilter);
+  const key=sortKey;
+  view.sort((a,b)=>{
+    const va=key==='name'||key==='type'||key==='path'?(key==='type'?TYPE[a.r.type]:key==='name'?a.r.name:a.e.path):a.e[key];
+    const vb=key==='name'||key==='type'||key==='path'?(key==='type'?TYPE[b.r.type]:key==='name'?b.r.name:b.e.path):b.e[key];
+    if(typeof va==='string') return sortDir*va.localeCompare(vb);
+    return sortDir*(va-vb);
+  });
+  let head='<tr>';
+  for(const [k,lbl,n] of COLS) head+=`<th class='so${n?' num':''}${sortKey===k?' act':''}' onclick='sortBy("${k}")'>${lbl}${sortKey===k?(sortDir<0?' ▾':' ▴'):''}</th>`;
+  head+='</tr>';
+  let body='';
+  for(const {r,e} of view){
+    const star=r.timeAssumed?'<span class="warn" title="craft time assumed">*</span>':'';
+    body+=`<tr class='click${selId===r.id?' sel':''}' onclick='selectRow("${r.id}")'>`+
+      `<td>${r.name}</td>`+
+      `<td><span class='pill ${r.type}'>${TYPE[r.type]}</span></td>`+
+      `<td class='dim'>${e.path==='default'?'—':e.path}</td>`+
+      `<td class='num'>${g(e.matCost)}</td>`+
+      `<td class='num dim'>${g(e.gold)}</td>`+
+      `<td class='num'>${g(e.total)}</td>`+
+      `<td class='num dim'>${e.EY.toFixed(2)}</td>`+
+      `<td class='num'>${g(e.sell)}</td>`+
+      `<td class='num ${e.net>=0?'good':'bad'}'><b>${sg(e.net)}</b></td>`+
+      `<td class='num ${e.perHr>=0?'good':'bad'}'>${sg(e.perHr)}${star}</td>`+
+      `<td class='num ${e.roi>=0?'good':'bad'}'>${pct(e.roi)}</td></tr>`;
+  }
+  $('table').innerHTML=head+body;
+}
+
+function selectRow(id){ selId=(selId===id?null:id); recalc(); if(selId) $('breakdown').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function renderBreakdown(id){
+  const r=RECIPES.find(x=>x.id===id); if(!r){ $('breakdown').innerHTML=''; return; }
+  const e=evalRecipe(r,PRICES,P.R,P.enable), bo=bestOption(r,PRICES);
+  let h=`<h2>${r.name} &mdash; breakdown</h2><div class='panel'>`;
+  if(r.materialOptions.length>1){
+    h+=`<div class='subh'>Gathering paths (cheapest auto-selected)</div><table><tr><th>Path</th><th class='num'>Material cost</th></tr>`;
+    r.materialOptions.map(o=>({c:o.category,cost:optionCost(o,PRICES)})).sort((a,b)=>a.cost-b.cost)
+      .forEach(o=>{ h+=`<tr><td>${o.c}${o.c===bo.cat?" <span class='accent'>← used</span>":''}</td><td class='num'>${g(o.cost)}</td></tr>`; });
+    h+=`</table>`;
+  }
+  h+=`<div class='subh'>Materials (${bo.cat==='default'?'recipe':bo.cat+' path'})</div>`;
+  h+=`<table><tr><th>Material</th><th class='num'>Qty</th><th class='num'>Unit price</th><th class='num'>Line cost</th></tr>`;
+  for(const it of bo.opt.items){
+    const up=unitPrice(it.id,PRICES);
+    h+=`<tr><td>${ITEMS[it.id].name}</td><td class='num'>${it.quantity}</td><td class='num dim'>${u2(up)}</td><td class='num'>${g(it.quantity*up)}</td></tr>`;
+  }
+  h+=`<tr><td class='dim'>Crafting gold (after cost reduction)</td><td class='num'></td><td class='num'></td><td class='num dim'>${g(e.gold)}</td></tr>`;
+  h+=`<tr><td><b>Total cost</b></td><td class='num'></td><td class='num'></td><td class='num'><b>${g(e.total)}</b></td></tr></table>`;
+  h+=`<div class='subh'>Result</div><table>`;
+  h+=`<tr><td>Base yield x great-success</td><td class='num'>${r.quantity} x (1+${e.GSC.toFixed(2)}%) = <b>${e.EY.toFixed(3)}</b></td></tr>`;
+  h+=`<tr><td>Sells for (each)</td><td class='num'>${g(e.sell)}  &minus; ${e.tax} tax = ${g(e.sell-e.tax)}</td></tr>`;
+  h+=`<tr><td>Revenue (EY x after-tax)</td><td class='num'>${g(e.revenue)}</td></tr>`;
+  h+=`<tr><td><b>Net profit / craft</b></td><td class='num ${e.net>=0?'good':'bad'}'><b>${sg(e.net)}</b></td></tr>`;
+  h+=`<tr><td>Craft time${r.timeAssumed?" <span class='warn'>(assumed)</span>":''} &rarr; per hour</td><td class='num ${e.perHr>=0?'good':'bad'}'>${fmtTime(e.time)} &rarr; ${sg(e.perHr)}/hr</td></tr>`;
+  h+=`<tr><td>ROI on gold invested</td><td class='num ${e.roi>=0?'good':'bad'}'>${pct(e.roi)}</td></tr></table></div>`;
+  $('breakdown').innerHTML=h;
+}
+
+// ====== prices: build editable grid once; edits update PRICES live ======
+function priceFields(){
+  const raw=[],craft=[];
+  for(const id in ITEMS){ (ITEMS[id].bundle>1?raw:craft).push(id); }
+  const cell=id=>`<div class='fld'><label>${ITEMS[id].name}</label>`+
+    `<input id='px_${ITEMS[id].slug}' type='number' step='1' oninput='editPrice("${ITEMS[id].slug}",this.value)'></div>`;
+  $('pxRaw').innerHTML  = raw.sort((a,b)=>ITEMS[a].name.localeCompare(ITEMS[b].name)).map(cell).join('');
+  $('pxCraft').innerHTML= craft.sort((a,b)=>ITEMS[a].name.localeCompare(ITEMS[b].name)).map(cell).join('');
+}
+function setPriceInputs(){ for(const id in ITEMS){ const f=$('px_'+ITEMS[id].slug); if(f) f.value=PRICES[ITEMS[id].slug]??0; } }
+function editPrice(slug,v){ PRICES[slug]=+v||0; recalc(); }
+function loadPrices(region){
+  let cached=null; try{ const raw=LS_get('loa_px_'+region); cached=raw?JSON.parse(raw):null; }catch(e){ cached=null; }
+  PRICES = (cached && Object.keys(cached).length) ? cached : Object.assign({},SNAPSHOT[region]||{});
+  const ts=LS_get('loa_px_ts_'+region);
+  $('pxSummary').innerHTML=`Market prices (editable) &mdash; ${region.toUpperCase()}, ${ts?('synced '+new Date(+ts).toLocaleString()):('snapshot '+new Date(SNAP_TS*1000).toLocaleDateString())}`;
+}
+
+// ====== toggles ======
+function setRegion(rg){ curRegion=rg; document.querySelectorAll('[data-rg]').forEach(b=>b.classList.toggle('active',b.dataset.rg===rg));
+  loadPrices(rg); setPriceInputs(); recalc(); }
+function setFilter(f){ curFilter=f; document.querySelectorAll('[data-ft]').forEach(b=>b.classList.toggle('active',b.dataset.ft===f)); recalc(); }
+function toggleGS(){ enableGS=!enableGS; $('gsBtn').classList.toggle('active',enableGS); $('gsBtn').textContent=enableGS?'On':'Off'; recalc(); }
+function toggleInputs(){ inputsCollapsed=!inputsCollapsed; $('infields').style.display=inputsCollapsed?'none':''; $('caret').innerHTML=inputsCollapsed?'&#9656;':'&#9662;'; }
+
+// ====== live sync via user-supplied CORS proxy ======
+async function syncPrices(){
+  const proxy=$('p_proxy').value.trim();
+  const st=$('syncStatus');
+  if(proxy) LS_set('loa_proxy',proxy);
+  if(!proxy){ st.innerHTML="No proxy set &mdash; using "+($('pxSummary').textContent.split('—')[1]||'snapshot')+". See Methodology to enable live sync."; return; }
+  st.textContent='Syncing '+curRegion.toUpperCase()+'…';
+  try{
+    const slugs=[...new Set(Object.keys(ITEMS).map(id=>ITEMS[id].slug))];
+    const res=await fetch(proxy,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({region_slug:curRegion,item_slugs:slugs})});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const arr=await res.json(); const m={}; arr.forEach(x=>m[x.item_slug]=x.price);
+    PRICES=m; LS_set('loa_px_'+curRegion,JSON.stringify(m));
+    LS_set('loa_px_ts_'+curRegion,Date.now());
+    loadPrices(curRegion); PRICES=m; setPriceInputs(); recalc();
+    st.textContent='Synced '+arr.length+' prices • '+new Date().toLocaleTimeString();
+  }catch(err){ st.innerHTML="<span class='warn'>Sync failed ("+err.message+")</span> &mdash; check the proxy URL. Using current prices."; }
+}
+
+// ====== boot ======
+function boot(){
+  try{
+    setDefaultsToInputs();
+    const px=LS_get('loa_proxy'); if(px) $('p_proxy').value=px;
+    priceFields();
+    loadPrices(curRegion); setPriceInputs();
+  }catch(e){
+    if(!PRICES||!Object.keys(PRICES).length) PRICES=Object.assign({},SNAPSHOT[curRegion]||{}); // ensure results still compute
+    const st=$('syncStatus'); if(st) st.innerHTML="<span class='warn'>Startup notice: "+e.message+"</span>";
+  }
+  try{ recalc(); }catch(e){ const s=$('summary'); if(s) s.innerHTML="<span class='bad'>Couldn't render: "+e.message+"</span>"; }
+  try{ toggleInputs(); }catch(e){}   // collapse so results show first
+  try{ syncPrices(); }catch(e){}     // auto-refresh only if a proxy is configured
+}
+// run now if the document is already parsed (script is at end of body), else on load
+if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',boot); else boot();
+</script>
+</body></html>
