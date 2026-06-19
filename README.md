@@ -16,8 +16,9 @@ Open `index.html` in a browser (or `python3 -m http.server` in this folder). The
 - **Great Success** — on by default; it doubles a craft's output `GSC%` of the time,
   so expected yield is `qty × (1 + GSC/100)`. Toggle off for worst-case.
 - **Click any row** for the full material breakdown (and, for fusion mats, which
-  gathering path is cheapest) — including a **good-to-buy** read on each input and a
-  **sell-now** read on the output (spot vs fair + 14-day range), same logic as the watch.
+  gathering path is cheapest) — including a **good-to-buy** read on each input, a
+  **sell-now** read on the output, and a **yest-vs-fair** column/line showing which
+  recent price move is driving the craft (an input below fair = cheaper lately).
 - **Prices** are editable. Set a mat's price toward 0 to model farming it yourself.
 - **Price watch** (bottom of the page) flags items whose yesterday's avg or live spot
   is ≥15% off the fair (robust) price, and judges whether the **current spot is a good

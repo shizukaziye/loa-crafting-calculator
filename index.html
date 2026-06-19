@@ -375,18 +375,21 @@ function renderBreakdown(id){
     h+=`</table>`;
   }
   h+=`<div class='subh'>Materials (${bo.cat==='default'?'recipe':bo.cat+' path'})</div>`;
-  h+=`<table><tr><th>Material</th><th class='num'>Qty</th><th class='num'>Unit price</th><th class='num'>Line cost</th></tr>`;
+  h+=`<table><tr><th>Material</th><th class='num'>Qty</th><th class='num'>Unit price</th><th class='num'>Line cost</th><th class='num'>Yest vs fair</th></tr>`;
   for(const it of bo.opt.items){
     const up=unitPrice(it.id,PRICES), di=dealInfo(ITEMS[it.id].slug);
     const ann=(di.fair && di.cls!=='dim') ? ` <span class='${di.cls}' style='font-size:11px' title='spot ${g(di.spot)} vs fair ${g(di.fair)}${di.rb?' · '+di.rb:''}'>${di.mark} ${di.verdict} ${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}%</span>` : '';
-    h+=`<tr><td>${ITEMS[it.id].name}${ann}</td><td class='num'>${it.quantity}</td><td class='num dim'>${u2(up)}</td><td class='num'>${g(it.quantity*up)}</td></tr>`;
+    const yvf=`<span style='color:var(${Math.abs(di.yestGap)>=0.08?(di.yestGap>0?'--high':'--low'):'--dim'})' title='yesterday ${g(di.yest)} vs fair ${g(di.fair)}'>${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}%</span>`;
+    h+=`<tr><td>${ITEMS[it.id].name}${ann}</td><td class='num'>${it.quantity}</td><td class='num dim'>${u2(up)}</td><td class='num'>${g(it.quantity*up)}</td><td class='num'>${yvf}</td></tr>`;
   }
-  h+=`<tr><td class='dim'>Crafting gold (after cost reduction)</td><td class='num'></td><td class='num'></td><td class='num dim'>${g(e.gold)}</td></tr>`;
-  h+=`<tr><td><b>Total cost</b></td><td class='num'></td><td class='num'></td><td class='num'><b>${g(e.total)}</b></td></tr></table>`;
+  h+=`<tr><td class='dim'>Crafting gold (after cost reduction)</td><td class='num'></td><td class='num'></td><td class='num dim'>${g(e.gold)}</td><td class='num'></td></tr>`;
+  h+=`<tr><td><b>Total cost</b></td><td class='num'></td><td class='num'></td><td class='num'><b>${g(e.total)}</b></td><td class='num'></td></tr></table>`;
+  h+=`<div class='note'><b>Yest vs fair</b> = yesterday's avg vs the smoothed fair price (fair is what cost/revenue use). A large value flags a recent move making this craft better or worse than its 2-week norm &mdash; e.g. an input well below fair (cheap lately) or an output above fair (selling high lately).</div>`;
   h+=`<div class='subh'>Result</div><table>`;
   h+=`<tr><td>Base yield x great-success</td><td class='num'>${r.quantity} x (1+${e.GSC.toFixed(2)}%) = <b>${e.EY.toFixed(3)}</b></td></tr>`;
   const di=dealInfo(ITEMS[r.id].slug);
   h+=`<tr><td>Fair (robust) &middot; yesterday &middot; spot</td><td class='num'>${g(di.fair)} &middot; ${g(di.yest)} &middot; ${g(di.spot)}</td></tr>`;
+  h+=`<tr><td>Yesterday vs fair <span class='dim'>(recent move)</span></td><td class='num'><span style='color:var(${Math.abs(di.yestGap)>=0.08?(di.yestGap>0?'--high':'--low'):'--dim'})'>${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}%</span></td></tr>`;
   h+=`<tr><td>Sell now? &mdash; spot vs fair</td><td class='num'><span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}%${di.rb?', '+di.rb:''})</span></td></tr>`;
   h+=`<tr><td>Sells for (each, after 5% tax)</td><td class='num'>${g(e.sell)} &minus; ${e.tax} = ${g(e.sell-e.tax)}</td></tr>`;
   h+=`<tr><td>Revenue (EY x after-tax)</td><td class='num'>${g(e.revenue)}</td></tr>`;
