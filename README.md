@@ -18,6 +18,9 @@ Open `index.html` in a browser (or `python3 -m http.server` in this folder). The
 - **Click any row** for the full material breakdown (and, for fusion mats, which
   gathering path is cheapest).
 - **Prices** are editable. Set a mat's price toward 0 to model farming it yourself.
+- **Price watch** (bottom of the page) flags market movers — items trending ≥20% over
+  ~10 days or whose recent price is ≥20% off fair — with each item's full 14-day
+  history, fair, yesterday's avg (used for the comparison), and live spot for reference.
 
 ## Live price sync (optional)
 

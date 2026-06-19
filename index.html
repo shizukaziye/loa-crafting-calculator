@@ -148,10 +148,6 @@ details.prices summary{cursor:pointer;font-size:11px;text-transform:uppercase;le
   <h2>Best craft right now</h2>
   <div class='hl' id='summary'></div>
 
-  <h2>Price watch &mdash; recent movers</h2>
-  <div class='note' style='margin:-4px 0 8px'>Flags items (above ~50g) <b>trending</b> &ge;20% vs ~10 days ago, or whose <b>live spot</b> is &ge;20% off its fair (robust) price &mdash; where the market is moving or the current listing looks distorted. Biggest movers first.</div>
-  <div class='panel' id='watch'></div>
-
   <h2>All crafts &mdash; ranked</h2>
   <div class='toprow' style='margin:0 0 8px'>
     <span><span class='lbl'>Show</span>
@@ -164,6 +160,10 @@ details.prices summary{cursor:pointer;font-size:11px;text-transform:uppercase;le
   <div class='panel'><table id='table'></table></div>
 
   <div id='breakdown'></div>
+
+  <h2>Price watch &mdash; recent movers</h2>
+  <div class='note' style='margin:-4px 0 8px'>Flags items (above ~50g) <b>trending</b> &ge;20% vs ~10 days ago, or whose <b>yesterday's average</b> (last completed day) is &ge;20% off its fair (robust) price. Shows the full 14-day history (oldest &rarr; today; today's live value is dimmed &amp; excluded from fair). The comparison uses yesterday's avg rather than the volatile live <b>spot</b> &mdash; spot shown for reference.</div>
+  <div class='panel' id='watch' style='overflow-x:auto'></div>
 
   <details class='method'>
     <summary>Methodology &amp; setup</summary>
@@ -290,28 +290,28 @@ function renderSummary(rows){
 
 // Price watch: items that are trending, or whose live spot diverges from fair (robust).
 function renderWatch(){
-  const TREND=0.20, GAP=0.20, MINVAL=50, CAP=14, mean=a=>a.reduce((x,y)=>x+y,0)/a.length, out=[];
+  const TREND=0.20, GAP=0.20, MINVAL=50, mean=a=>a.reduce((x,y)=>x+y,0)/a.length, out=[];
   for(const id in ITEMS){
     const sl=ITEMS[id].slug, d=SNAP[sl]; if(!d) continue;
     const fair=robustOf(sl), spot=spotOf(sl), hh=d.h||[];
-    if(fair<MINVAL) continue;                               // skip sub-50g items: noisy % , negligible gold impact
+    if(fair<MINVAL) continue;                               // skip sub-50g items: noisy %, negligible gold
+    const yest = hh.length>1 ? hh[1] : (hh[0]??spot);       // yesterday = most recent COMPLETED day (h[0] is today/live)
     let trend=null;                                         // recent completed (days 1-3) vs ~10d ago (days 7+)
     if(hh.length>=8){ const rc=hh.slice(1,4), ol=hh.slice(7); if(rc.length&&ol.length&&mean(ol)) trend=(mean(rc)-mean(ol))/mean(ol); }
-    const gap=fair?(spot-fair)/fair:0;
+    const gap=fair?(yest-fair)/fair:0;                      // comparison uses yesterday's avg, not the live spot
     if((trend!==null&&Math.abs(trend)>=TREND)||Math.abs(gap)>=GAP)
-      out.push({name:ITEMS[id].name, fair, spot, trend, gap, sig:Math.max(Math.abs(trend||0),Math.abs(gap))});
+      out.push({name:ITEMS[id].name, fair, yest, spot, hist:hh, trend, gap, sig:Math.max(Math.abs(trend||0),Math.abs(gap))});
   }
   out.sort((a,b)=>b.sig-a.sig);
-  const total=out.length;
-  if(!total){ $('watch').innerHTML="<div class='note' style='margin:0'>Quiet market &mdash; no item over ~50g is trending &ge;20% vs ~10 days ago, and every spot is within 20% of its fair price.</div>"; return; }
-  let h="<table><tr><th>Item</th><th class='num'>Fair</th><th class='num'>Spot</th><th class='num'>Trend (vs ~10d)</th><th>Live spot vs fair</th></tr>";
-  for(const r of out.slice(0,CAP)){
+  if(!out.length){ $('watch').innerHTML="<div class='note' style='margin:0'>Quiet market &mdash; no item over ~50g is trending &ge;20% vs ~10 days ago, and every yesterday-avg is within 20% of its fair price.</div>"; return; }
+  let h="<table><tr><th>Item</th><th class='num'>Fair</th><th class='num'>Yesterday</th><th class='num'>Spot</th><th class='num'>Trend</th><th>Yest vs fair</th><th>14-day history (oldest &rarr; today)</th></tr>";
+  for(const r of out){
     const tr=r.trend===null?"<span class='dim'>&mdash;</span>"
       :`<span style='color:var(${r.trend>=0?'--high':'--low'})'>${r.trend>=0?'▲':'▼'} ${Math.abs(r.trend*100).toFixed(0)}%</span>`;
-    const gp=Math.abs(r.gap)>=GAP?`<span class='warn'>&#9888; spot ${r.gap>0?'+':''}${Math.round(r.gap*100)}% ${r.gap>0?'high':'low'}</span>`:"<span class='dim'>in line</span>";
-    h+=`<tr><td>${r.name}</td><td class='num'>${g(r.fair)}</td><td class='num dim'>${g(r.spot)}</td><td class='num'>${tr}</td><td>${gp}</td></tr>`;
+    const gp=Math.abs(r.gap)>=GAP?`<span class='warn'>&#9888; ${r.gap>0?'+':''}${Math.round(r.gap*100)}% ${r.gap>0?'high':'low'}</span>`:"<span class='dim'>in line</span>";
+    const series=r.hist.slice().reverse().map((v,i,arr)=> i===arr.length-1 ? `<span class='dim' title='today (live, excluded from fair)'>${g(v)}</span>` : g(v)).join('  ');
+    h+=`<tr><td>${r.name}</td><td class='num'>${g(r.fair)}</td><td class='num'>${g(r.yest)}</td><td class='num dim'>${g(r.spot)}</td><td class='num'>${tr}</td><td>${gp}</td><td class='mono' style='font-size:11px;white-space:nowrap'>${series}</td></tr>`;
   }
-  if(total>CAP) h+=`<tr><td colspan='5' class='dim'>&hellip; + ${total-CAP} more smaller movers</td></tr>`;
   $('watch').innerHTML=h;
 }
 
