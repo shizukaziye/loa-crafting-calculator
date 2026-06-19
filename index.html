@@ -72,17 +72,20 @@ details.method summary{cursor:pointer;font-size:11px;text-transform:uppercase;le
 details.method p,details.method li{font-size:13px;color:var(--text)}
 details.prices{margin-top:12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:4px 12px}
 details.prices summary{cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;padding:6px 0}
-@media(max-width:760px){.redux{grid-template-columns:repeat(2,1fr)}}
+.ninp{width:62px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:13px}
+.knob{display:inline-flex;align-items:center;gap:6px}
+#table tr:nth-child(2n) td,#watch tr:nth-child(2n) td{background:rgba(255,255,255,.022)}
+@media(max-width:760px){.redux{grid-template-columns:repeat(2,1fr)}.panel{overflow-x:auto}table{font-size:12px}}
 </style>
 </head><body>
 <div class='wrap'>
   <h1>Lost Ark Stronghold Crafting &mdash; Profit Calculator</h1>
-  <div class='tag'>Net gold per craft / per hour / ROI for every craftable, ranked. Sells on the market with a 5% tax (rounded up). Mats &amp; outputs priced at a robust <b>recency-weighted 14-day average</b> by default (tunable; toggle to live spot) so a bought-out market can't distort a craft. Faithful port of loa-buddy's engine + two meals it doesn't have.</div>
+  <div class='tag'>Every stronghold craft ranked by net gold &mdash; per craft, per hour, ROI. Priced at a robust <b>14-day average</b> (not the live spot) so a bought-out market can't distort it. Method &amp; setup in the dropdown at the bottom.</div>
 
   <!-- INPUTS: sticky, collapsible, default collapsed -->
   <div class='inputs'>
     <div class='ihdr'>
-      <span class='tgl' onclick='toggleInputs()'><span id='caret'>&#9662;</span> Inputs &amp; reductions</span>
+      <span class='tgl' onclick='toggleInputs()'><span id='caret'>&#9662;</span> Inputs &amp; settings</span>
       <span id='syncStatus' class='note' style='margin:0'></span>
     </div>
     <div id='infields'>
@@ -98,52 +101,48 @@ details.prices summary{cursor:pointer;font-size:11px;text-transform:uppercase;le
         <span><button onclick='syncPrices()'>&#8635; Sync live prices</button></span>
       </div>
       <div class='toprow' style='margin-top:8px'>
-        <span class='lbl'>Robust pricing</span>
-        <span style='display:flex;align-items:center;gap:6px'><span class='lbl' style='margin:0'>drop hi/lo (each)</span>
-          <input id='p_trim' type='number' min='0' step='1' style='width:50px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px' oninput='setRobustParams()'></span>
-        <span style='display:flex;align-items:center;gap:6px'><span class='lbl' style='margin:0'>recency decay</span>
-          <input id='p_decay' type='number' min='0.5' max='1' step='0.01' style='width:64px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px' oninput='setRobustParams()'></span>
+        <span class='lbl'>Robust price</span>
+        <span class='knob'><span class='lbl' style='margin:0'>drop hi/lo</span><input id='p_trim' type='number' min='0' step='1' class='ninp' oninput='setRobustParams()'></span>
+        <span class='knob'><span class='lbl' style='margin:0'>decay</span><input id='p_decay' type='number' min='0.5' max='1' step='0.01' class='ninp' oninput='setRobustParams()'></span>
         <span class='note' id='decayNote' style='margin:0'></span>
       </div>
 
-      <div class='subh'>Crafting Reductions (%) &mdash; General stacks onto the category-specific column</div>
-      <div class='redux'>
-        <div class='rc'><h4>General</h4>
-          <div class='fld'><label>Cost</label><input id='r_general_cost' type='number' step='1'></div>
-          <div class='fld'><label>Time</label><input id='r_general_time' type='number' step='1'></div>
-          <div class='fld'><label>Great Success</label><input id='r_general_gs' type='number' step='1'></div></div>
-        <div class='rc'><h4>Battle</h4>
-          <div class='fld'><label>Cost</label><input id='r_battle_cost' type='number' step='1'></div>
-          <div class='fld'><label>Time</label><input id='r_battle_time' type='number' step='1'></div>
-          <div class='fld'><label>Great Success</label><input id='r_battle_gs' type='number' step='1'></div></div>
-        <div class='rc'><h4>Cooking</h4>
-          <div class='fld'><label>Cost</label><input id='r_cooking_cost' type='number' step='1'></div>
-          <div class='fld'><label>Time</label><input id='r_cooking_time' type='number' step='1'></div>
-          <div class='fld'><label>Great Success</label><input id='r_cooking_gs' type='number' step='1'></div></div>
-        <div class='rc'><h4>Special (fusion)</h4>
-          <div class='fld'><label>Cost</label><input id='r_special_cost' type='number' step='1'></div>
-          <div class='fld'><label>Time</label><input id='r_special_time' type='number' step='1'></div>
-          <div class='fld'><label>Great Success</label><input id='r_special_gs' type='number' step='1'></div></div>
-      </div>
+      <details class='prices'>
+        <summary>Crafting reductions (%)</summary>
+        <div class='note' style='margin:2px 0 8px'>General stacks onto the category-specific column. Edits apply instantly.</div>
+        <div class='redux'>
+          <div class='rc'><h4>General</h4>
+            <div class='fld'><label>Cost</label><input id='r_general_cost' type='number' step='1' oninput='recalc()'></div>
+            <div class='fld'><label>Time</label><input id='r_general_time' type='number' step='1' oninput='recalc()'></div>
+            <div class='fld'><label>Great Success</label><input id='r_general_gs' type='number' step='1' oninput='recalc()'></div></div>
+          <div class='rc'><h4>Battle</h4>
+            <div class='fld'><label>Cost</label><input id='r_battle_cost' type='number' step='1' oninput='recalc()'></div>
+            <div class='fld'><label>Time</label><input id='r_battle_time' type='number' step='1' oninput='recalc()'></div>
+            <div class='fld'><label>Great Success</label><input id='r_battle_gs' type='number' step='1' oninput='recalc()'></div></div>
+          <div class='rc'><h4>Cooking</h4>
+            <div class='fld'><label>Cost</label><input id='r_cooking_cost' type='number' step='1' oninput='recalc()'></div>
+            <div class='fld'><label>Time</label><input id='r_cooking_time' type='number' step='1' oninput='recalc()'></div>
+            <div class='fld'><label>Great Success</label><input id='r_cooking_gs' type='number' step='1' oninput='recalc()'></div></div>
+          <div class='rc'><h4>Special (fusion)</h4>
+            <div class='fld'><label>Cost</label><input id='r_special_cost' type='number' step='1' oninput='recalc()'></div>
+            <div class='fld'><label>Time</label><input id='r_special_time' type='number' step='1' oninput='recalc()'></div>
+            <div class='fld'><label>Great Success</label><input id='r_special_gs' type='number' step='1' oninput='recalc()'></div></div>
+        </div>
+        <div class='barrow'><button onclick='resetDefaults();recalc()' style='background:var(--panel2);color:var(--text)'>Reset reductions &amp; robust knobs</button></div>
+      </details>
 
       <details class='prices'>
-        <summary id='pxSummary'>Market prices (editable)</summary>
-        <div class='note' style='margin:2px 0 8px'>Per <b>bundle</b> as listed on the auction house (gathered mats = per 100, crafted items = per 1). Edit any cell to override; "Sync live prices" refills from the market.</div>
+        <summary id='pxSummary'>Market prices &amp; live-sync</summary>
+        <div class='note' style='margin:2px 0 8px'>Prices are per <b>bundle</b> (gathered mats = per 100, crafted = per 1). Edit any cell to override.</div>
         <div class='subh'>Gathered materials (per 100)</div>
         <div class='ig' id='pxRaw'></div>
         <div class='subh'>Crafted items &amp; outputs (per 1)</div>
         <div class='ig' id='pxCraft'></div>
+        <div class='subh'>Live-sync proxy (optional)</div>
+        <div class='ig' style='grid-template-columns:1fr'>
+          <div class='fld'><label>Proxy URL &mdash; paste your CORS worker for in-browser "Sync live prices" (see Methodology). Blank = use the baked snapshot or edit by hand.</label><input id='p_proxy' type='text' placeholder='https://your-worker.workers.dev/v1/prices/latest'></div>
+        </div>
       </details>
-
-      <div class='subh'>Live-sync proxy (optional)</div>
-      <div class='ig' style='grid-template-columns:1fr'>
-        <div class='fld'><label>Proxy URL &mdash; paste your CORS worker to enable in-browser "Sync live prices" (see Methodology). Leave blank to use the baked snapshot or edit prices by hand.</label><input id='p_proxy' type='text' placeholder='https://your-worker.workers.dev/v1/prices/latest'></div>
-      </div>
-
-      <div class='barrow'>
-        <button onclick='recalc()'>Recalculate</button>
-        <button onclick='resetDefaults();recalc()' style='background:var(--panel2);color:var(--text)'>Reset reductions</button>
-      </div>
     </div>
   </div>
 
@@ -225,6 +224,19 @@ const TYPE={cooking:'Cooking',special:'Fusion',battle:'Battle'};
 // safe localStorage — file:// and some privacy modes throw on access; never let that blank the page
 const LS_get=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
 const LS_set=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+// signed % colored by direction (up=high, down=low, small=dim) — one consistent token
+const moveTag=(f,thr)=>{const c=Math.abs(f)>=(thr||0.08)?(f>0?'--high':'--low'):'--dim';return `<span style='color:var(${c})'>${f>0?'+':''}${Math.round(f*100)}%</span>`;};
+// compact inline sparkline of a price series (newest-first); exact values on hover
+function sparkline(h){
+  if(!h||h.length<2) return "<span class='dim'>&mdash;</span>";
+  const a=h.slice().reverse(), mn=Math.min(...a), mx=Math.max(...a), rng=(mx-mn)||1, W=120,H=22,P=2,n=a.length;
+  const X=i=>(P+i/(n-1)*(W-2*P)), Y=v=>(H-P-(v-mn)/rng*(H-2*P));
+  const pts=a.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ');
+  return `<svg width='${W}' height='${H}' viewBox='0 0 ${W} ${H}' style='vertical-align:middle'>`
+    +`<title>newest&#8594;oldest: ${h.map(x=>g(x)).join(' / ')}</title>`
+    +`<polyline points='${pts}' style='fill:none;stroke:var(--accent);stroke-width:1.5'/>`
+    +`<circle cx='${X(n-1).toFixed(1)}' cy='${Y(a[n-1]).toFixed(1)}' r='2.2' style='fill:var(--high)'/></svg>`;
+}
 
 // ====== defaults (from the user's reduction screenshot) ======
 const DEFAULTS={
@@ -309,14 +321,11 @@ function dealInfo(slug){
   return {fair,yest,spot,yestGap,spotGap,pct,isOut,verdict,cls,mark,rb};
 }
 function watchRow(name, di, hist){
-  const FLAG=0.15;
-  const yg=`<span style='color:var(${Math.abs(di.yestGap)>=FLAG?(di.yestGap>0?'--high':'--low'):'--dim'})'>${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}%</span>`;
   const deal=`<span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}% vs fair${di.rb?', '+di.rb:''})</span>`;
-  const series=hist.map((v,i)=> i===0?`<span class='dim' title='today (live, excluded from fair)'>${g(v)}</span>`:g(v)).join('  ');
-  return `<tr><td>${name}</td><td class='num'>${g(di.fair)}</td><td class='num'>${g(di.yest)}</td><td class='num dim'>${g(di.spot)}</td><td class='num'>${yg}</td><td>${deal}</td><td class='mono' style='font-size:11px;white-space:nowrap'>${series}</td></tr>`;
+  return `<tr><td>${name}</td><td class='num'>${g(di.fair)}</td><td class='num'>${g(di.yest)}</td><td class='num dim'>${g(di.spot)}</td><td class='num'>${moveTag(di.yestGap,0.15)}</td><td>${deal}</td><td>${sparkline(hist)}</td></tr>`;
 }
 function watchTable(rows, dealHdr){
-  let h=`<table><tr><th>Item</th><th class='num'>Fair</th><th class='num'>Yesterday</th><th class='num'>Spot</th><th class='num'>Yest vs fair</th><th>${dealHdr}</th><th>14-day history (today &rarr; oldest)</th></tr>`;
+  let h=`<table><tr><th>Item</th><th class='num'>Fair</th><th class='num'>Yesterday</th><th class='num'>Spot</th><th class='num'>Yest vs fair</th><th>${dealHdr}</th><th>14-day trend</th></tr>`;
   for(const r of rows) h+=watchRow(r.name, r.di, r.hist);
   return h+'</table>';
 }
@@ -379,13 +388,12 @@ function selectRow(id){ selId=(selId===id?null:id); const md=$('matdetail'); if(
 function showMatDetail(id){
   const m=ITEMS[id]; if(!m) return;
   const di=dealInfo(m.slug), hh=(SNAP[m.slug]||{}).h||[];
-  const ygc=`color:var(${Math.abs(di.yestGap)>=0.08?(di.yestGap>0?'--high':'--low'):'--dim'})`;
   let h=`<h2>${m.name} &mdash; price detail</h2><div class='panel'><table>`;
   h+=`<tr><td>Fair (robust &mdash; used in calcs)</td><td class='num'><b>${g(di.fair)}</b>${m.bundle>1?` <span class='dim'>(${u2(di.fair/m.bundle)}/unit)</span>`:''}</td></tr>`;
-  h+=`<tr><td>Yesterday (last completed day)</td><td class='num'>${g(di.yest)} <span style='${ygc}'>(${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}% vs fair)</span></td></tr>`;
+  h+=`<tr><td>Yesterday (last completed day)</td><td class='num'>${g(di.yest)} ${moveTag(di.yestGap)} vs fair</td></tr>`;
   h+=`<tr><td>Spot (live lowest)</td><td class='num'>${g(di.spot)} &middot; <span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}% vs fair${di.rb?', '+di.rb:''})</span></td></tr>`;
-  h+=`</table><div class='subh'>14-day history (today &rarr; oldest)</div>`;
-  h+=`<div class='mono' style='font-size:12px;white-space:nowrap;overflow-x:auto'>${hh.map((v,i)=> i===0?`<span class='dim' title='today (live, excluded from fair)'>${g(v)}</span>`:g(v)).join('   ')}</div>`;
+  h+=`</table><div class='subh'>14-day trend</div>`;
+  h+=`<div>${sparkline(hh)} <span class='dim' style='font-size:11px'>hover for daily values</span></div>`;
   h+=`<div class='note'>Same read as the price watch &mdash; fair is the robust price used in the calculator; yesterday-vs-fair is the recent move; the spot verdict says whether buying now is good.</div></div>`;
   $('matdetail').innerHTML=h; $('matdetail').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -404,7 +412,7 @@ function renderBreakdown(id){
   for(const it of bo.opt.items){
     const up=unitPrice(it.id,PRICES), di=dealInfo(ITEMS[it.id].slug);
     const ann=(di.fair && di.cls!=='dim') ? ` <span class='${di.cls}' style='font-size:11px' title='spot ${g(di.spot)} vs fair ${g(di.fair)}${di.rb?' · '+di.rb:''}'>${di.mark} ${di.verdict} ${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}%</span>` : '';
-    const yvf=`<span style='color:var(${Math.abs(di.yestGap)>=0.08?(di.yestGap>0?'--high':'--low'):'--dim'})' title='yesterday ${g(di.yest)} vs fair ${g(di.fair)}'>${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}%</span>`;
+    const yvf=moveTag(di.yestGap);
     h+=`<tr><td><span class='mlink' onclick='showMatDetail("${it.id}")'>${ITEMS[it.id].name}</span>${ann}</td><td class='num'>${it.quantity}</td><td class='num dim'>${u2(up)}</td><td class='num'>${g(it.quantity*up)}</td><td class='num'>${yvf}</td></tr>`;
   }
   h+=`<tr><td class='dim'>Crafting gold (after cost reduction)</td><td class='num'></td><td class='num'></td><td class='num dim'>${g(e.gold)}</td><td class='num'></td></tr>`;
@@ -414,7 +422,7 @@ function renderBreakdown(id){
   h+=`<tr><td>Base yield x great-success</td><td class='num'>${r.quantity} x (1+${e.GSC.toFixed(2)}%) = <b>${e.EY.toFixed(3)}</b></td></tr>`;
   const di=dealInfo(ITEMS[r.id].slug);
   h+=`<tr><td>Fair (robust) &middot; yesterday &middot; spot</td><td class='num'>${g(di.fair)} &middot; ${g(di.yest)} &middot; ${g(di.spot)}</td></tr>`;
-  h+=`<tr><td>Yesterday vs fair <span class='dim'>(recent move)</span></td><td class='num'><span style='color:var(${Math.abs(di.yestGap)>=0.08?(di.yestGap>0?'--high':'--low'):'--dim'})'>${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}%</span></td></tr>`;
+  h+=`<tr><td>Yesterday vs fair <span class='dim'>(recent move)</span></td><td class='num'>${moveTag(di.yestGap)}</td></tr>`;
   h+=`<tr><td>Sell now? &mdash; spot vs fair</td><td class='num'><span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}%${di.rb?', '+di.rb:''})</span></td></tr>`;
   h+=`<tr><td>Sells for (each, after 5% tax)</td><td class='num'>${g(e.sell)} &minus; ${e.tax} = ${g(e.sell-e.tax)}</td></tr>`;
   h+=`<tr><td>Revenue (EY x after-tax)</td><td class='num'>${g(e.revenue)}</td></tr>`;
