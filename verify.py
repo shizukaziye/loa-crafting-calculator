@@ -75,7 +75,7 @@ def close(a,b,eps=0.02): return abs(a-b) <= eps
 fails=0
 print(f"{'recipe':32s} {'region':3s} {'net/craft':>11s} {'net/hr':>10s} {'EY':>7s} {'path':>10s}")
 for region in ("nae","euc"):
-    prices=FROZEN[region]
+    prices={s: FROZEN[region][s]["s"] for s in FROZEN[region]}  # anchors captured on the spot basis
     for r in sorted(RECIPES, key=lambda x:x["id"]):
         e=evaluate(r,prices)
         print(f"{r['id']:32s} {region:3s} {e['net']:11.2f} {e['perHr']:10.2f} {e['EY']:7.3f} {e['path']:>10s}")

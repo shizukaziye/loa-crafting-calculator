@@ -62,10 +62,15 @@ python3 verify.py
 
 ## Notes & caveats
 
-- The two added meals' **craft times are assumed (75 / 60 min)** and marked with `*`
-  on the per-hour column — confirm them in-game. This affects per-hour only, not
-  per-craft.
-- Mats are valued at **market buy price** (true opportunity cost).
+- **Pricing:** every item carries a current *spot* (lowest listing) and a *7-day
+  median* of daily averages. Spot spikes when a market is bought out (only pricey
+  listings remain), so the app defaults to the **median**; the breakdown flags any
+  item whose spot is ≥15% off its median (⚠). Toggle **Pricing → Spot** for live
+  lowest prices. `refresh_prices.py` and the scheduled Action compute both.
+- **Craft times:** Virtuoso's Striploin is set to ~49 min (your in-game figure);
+  Specialist's Beef is still an assumed 60 min (marked `*`) — per-hour only.
+- Mats are valued at **market price** (true opportunity cost); zero one out to
+  model farming it yourself.
 - To add a recipe, append an object to the `RECIPES` array in `index.html`
   (`id, name, type, craftingCost, quantity, craftingTime, materialOptions`) and add
   any new item ids to `ITEMS` with their `slug`/`bundle`.
