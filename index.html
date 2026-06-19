@@ -112,6 +112,7 @@ footer .fineprint{margin-top:6px;font-size:11px;color:var(--none)}
   <h1>Lost Ark Stronghold Crafting &mdash; Profit Calculator</h1>
   <div class='tag'>Every stronghold craft ranked by net gold &mdash; per craft, per hour, ROI. Priced at a robust <b>14-day average</b> (not the live spot) so a bought-out market can't distort it. Method &amp; setup in the dropdown at the bottom.</div>
   <div class='xlink'>Looking to flip on the market instead? Try the <a href='https://shizukaziye.github.io/loa-deal-finder/'>Lost Ark Deal Finder &rarr;</a></div>
+  <div id='updated' class='note' style='margin:6px 0 14px'></div>
 
   <!-- INPUTS: sticky, collapsible, default collapsed -->
   <div class='inputs'>
@@ -355,7 +356,7 @@ function renderSummary(rows){
   let h=`<div class='big'>Top profit / craft: <b class='accent'>${r.name}</b> &mdash; <b class='${e.net>=0?'good':'bad'}'>${sg(e.net)} gold</b> per craft `+
         `<span class='dim'>(${sg(e.perHr)}/hr, ${pct(e.roi)} ROI)</span></div>`;
   if(bestHr.r.id!==r.id) h+=`<div class='note'>Best per <b>hour</b>: <b class='accent'>${bestHr.r.name}</b> at <b class='good'>${sg(bestHr.e.perHr)}/hr</b> (${sg(bestHr.e.net)}/craft).</div>`;
-  h+=`<div class='note'>${prof} of ${rows.length} profitable to sell &middot; region <b>${curRegion.toUpperCase()}</b> &middot; <b>${basis==='m'?'robust':'spot'}</b> pricing &middot; prices as of ${new Date(SNAP_TS*1000).toLocaleDateString()}${P.enable?'':' &middot; great success OFF'}.</div>`;
+  h+=`<div class='note'>${prof} of ${rows.length} profitable to sell &middot; region <b>${curRegion.toUpperCase()}</b> &middot; <b>${basis==='m'?'robust':'spot'}</b> pricing${P.enable?'':' &middot; great success OFF'}.</div>`;
   $('summary').innerHTML=h;
 }
 
@@ -583,6 +584,7 @@ function boot(){
     if(!Object.keys(PRICES).length){ SNAP=SNAPSHOT[curRegion]||{}; buildPrices(); } // ensure results still compute
     const st=$('syncStatus'); if(st) st.innerHTML="<span class='warn'>Startup notice: "+e.message+"</span>";
   }
+  try{ const u=$('updated'); if(u) u.innerHTML='Prices last updated <b class="accent">'+new Date(SNAP_TS*1000).toLocaleString()+'</b> <span class="dim">(your local time) &middot; auto-refreshed every 6h</span>'; }catch(e){}
   try{ recalc(); }catch(e){ const s=$('summary'); if(s) s.innerHTML="<span class='bad'>Couldn't render: "+e.message+"</span>"; }
   try{ toggleInputs(); }catch(e){}   // collapse so results show first
   try{ syncPrices(); }catch(e){}     // auto-refresh only if a proxy is configured
