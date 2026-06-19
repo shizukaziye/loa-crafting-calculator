@@ -55,6 +55,17 @@ def evaluate(r, prices):
     return dict(gold=gold,path=cat,matCost=matCost,total=total,EY=EY,sell=sell,tax=t,
                 net=net,perHr=perHr,roi=(net/total if total>0 else 0))
 
+def robust_price(h, te, d):                      # mirror of robustPrice() in index.html
+    if not h: return None
+    a=list(h)
+    if te>0 and len(a)>2*te:
+        idx=sorted(range(len(a)), key=lambda i:a[i])
+        drop=set(idx[:te])|set(idx[len(idx)-te:])
+        a=[v for i,v in enumerate(a) if i not in drop]
+    num=den=0.0; w=1.0
+    for v in a: num+=v*w; den+=w; w*=d
+    return int(math.floor(num/den+0.5)) if den else None     # Math.round-compatible
+
 # ---- reference values captured from the shipped JS (preview_eval) ----
 ANCHORS = {
  ("nae","virtuoso_striploin"):     dict(net=1932.64, total=3957.15, EY=1.0525, sell=5891, tax=295, gold=74, path="default"),
@@ -68,6 +79,13 @@ ANCHORS = {
  ("nae","splendid_elemental_hp_potion"): dict(net=60.42),         # input is crafted elemental_hp_potion
  ("euc","virtuoso_striploin"):     dict(net=990.955, sell=5897, tax=295, total=4905.15),       # region switch
  ("euc","abidos_fusion_material"): dict(net=114.82, sell=140, tax=7, gold=332),
+}
+
+# robust-price reference values captured from the shipped JS (trim 2 each side, decay 0.90)
+ROBUST_ANCHORS = {
+ ("nae","masters-herb-steak"):1784, ("nae","virtuoso-striploin"):5995, ("nae","specialist-beef"):2173,
+ ("nae","abidos-fusion-material"):135, ("nae","fish"):173, ("nae","abidos-solar-carp"):2322,
+ ("euc","masters-herb-steak"):2241, ("euc","virtuoso-striploin"):5946, ("euc","fish"):324, ("euc","abidos-solar-carp"):2252,
 }
 
 def close(a,b,eps=0.02): return abs(a-b) <= eps
@@ -87,8 +105,13 @@ for region in ("nae","euc"):
                 if not ok:
                     fails+=1; print(f"   !! MISMATCH {region}/{r['id']}.{k}: got {got!r} expected {v!r}")
 
-n=len(ANCHORS)
+for (region,slug),exp in ROBUST_ANCHORS.items():     # robust estimator parity (trim 2, decay 0.90)
+    got=robust_price(FROZEN[region][slug]["h"], 2, 0.90)
+    if got!=exp:
+        fails+=1; print(f"   !! ROBUST MISMATCH {region}/{slug}: got {got} expected {exp}")
+
+n=len(ANCHORS)+len(ROBUST_ANCHORS)
 if fails:
-    print(f"\nFAIL — {fails} mismatch(es) across {n} anchors. JS and Python have drifted.")
+    print(f"\nFAIL — {fails} mismatch(es) across {n} anchors (engine + robust). JS and Python have drifted.")
     sys.exit(1)
-print(f"\nPASS — Python mirror reproduces all {n} captured browser anchors. JS/PY in parity.")
+print(f"\nPASS — Python mirror reproduces all {n} captured browser anchors (engine + robust pricing). JS/PY in parity.")

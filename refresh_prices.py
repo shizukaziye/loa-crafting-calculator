@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """Refresh the baked price snapshot inside index.html — no cloud, no proxy.
 
-For every item the calculator needs (both regions) this records two prices:
-  s = spot      — the current lowest listing (can be distorted when a market is
-                  bought out, leaving only overpriced listings)
-  m = median    — median of the last WINDOW daily average prices, a robust "fair"
-                  price that ignores single-day spikes/dumps
+For every item (both regions) this records:
+  s = spot          — current lowest listing (distorts when a market is bought out)
+  h = [avg, ...]     — up to 14 daily AVERAGE prices, newest-first
 
-The app defaults to the median; spot is a toggle. The market API works fine
-server-side (CORS only blocks browsers), so this is 100% reliable with zero setup.
+The app turns `h` into a robust "fair" price = trimmed, recency-weighted mean
+(drop the N highest & N lowest days, then weight the rest 1, d, d^2, ... by
+recency) — with the trim count and decay `d` adjustable live in the page. Spot is
+a toggle. The market API works server-side (CORS only blocks browsers), so this
+is 100% reliable with zero setup.
 
     python3 refresh_prices.py
 """
-import json, re, subprocess, sys, time, datetime, statistics, pathlib
+import json, re, subprocess, sys, time, datetime, pathlib
 
-HTML   = pathlib.Path(__file__).with_name("index.html")
-BASE   = "https://marketdata-api.yrzhao1068589.workers.dev/v1"
-WINDOW = 7                       # days of history for the median
-src    = HTML.read_text()
+HTML        = pathlib.Path(__file__).with_name("index.html")
+BASE        = "https://marketdata-api.yrzhao1068589.workers.dev/v1"
+HIST_WINDOW = 14                 # days of history baked per item (app weights within this)
+src         = HTML.read_text()
 
 def grab(name):
     m = re.search(r'^const %s=(.*);\s*$' % name, src, re.M)
@@ -35,26 +36,23 @@ def fetch_spot(region):
     return {row["item_slug"]: row["price"] for row in json.loads(out)}
 
 END   = datetime.date.today()
-START = END - datetime.timedelta(days=WINDOW + 5)   # extra cushion for missing days
-def fetch_median(region, slug, spot):
+START = END - datetime.timedelta(days=HIST_WINDOW + 6)   # cushion for missing days
+def fetch_hist(region, slug):
     url = f"{BASE}/prices/historical/{region}/{slug}?start_date={START}&end_date={END}"
     try:
-        days = json.loads(subprocess.check_output(["curl","-s",url], timeout=30))
-        avgs = [d["avg_price"] for d in days if d.get("avg_price") is not None]
-        if len(avgs) >= 2:
-            return round(statistics.median(avgs[-WINDOW:]))
+        days = json.loads(subprocess.check_output(["curl","-s",url], timeout=30))   # oldest -> newest
+        avgs = [round(d["avg_price"]) for d in days if d.get("avg_price") is not None]
+        return list(reversed(avgs))[:HIST_WINDOW]                                    # newest -> oldest
     except Exception:
-        pass
-    return spot                                     # fall back to spot if no history
+        return []
 
 snap = {}
 for region in ("nae", "euc"):
     spot = fetch_spot(region)
     snap[region] = {}
     for slug in slugs:
-        s = spot.get(slug, 0)
-        snap[region][slug] = {"s": s, "m": fetch_median(region, slug, s)}
-    print(f"  {region}: {len(snap[region])} items priced (spot + {WINDOW}-day median)")
+        snap[region][slug] = {"s": spot.get(slug, 0), "h": fetch_hist(region, slug)}
+    print(f"  {region}: {len(snap[region])} items (spot + up to {HIST_WINDOW}d history)")
 
 if snap == grab("SNAPSHOT"):
     print("Prices unchanged since last snapshot — nothing to write.")

@@ -62,11 +62,15 @@ python3 verify.py
 
 ## Notes & caveats
 
-- **Pricing:** every item carries a current *spot* (lowest listing) and a *7-day
-  median* of daily averages. Spot spikes when a market is bought out (only pricey
-  listings remain), so the app defaults to the **median**; the breakdown flags any
-  item whose spot is ≥15% off its median (⚠). Toggle **Pricing → Spot** for live
-  lowest prices. `refresh_prices.py` and the scheduled Action compute both.
+- **Pricing:** every item carries a current *spot* (lowest listing) and **14 days
+  of daily averages**. The default **robust** price drops the highest & lowest few
+  days, then takes a *recency-weighted* mean of the rest (newest day ×1, each older
+  day ×`decay`) — so it tracks real moves but a bought-out spike (or a lowball)
+  can't sway it. The window/weights are tunable live in the page (**drop hi/lo** and
+  **recency decay**; defaults: drop 2 each, decay 0.90 ≈ "halves ~6.6 days back").
+  The breakdown flags any item whose spot is ≥15% off its robust price (⚠). Toggle
+  **Pricing → Spot** for live lowest prices. `refresh_prices.py` bakes the daily
+  history; the app computes the robust value client-side so the knobs are instant.
 - **Craft times:** Virtuoso's Striploin is set to ~49 min (your in-game figure);
   Specialist's Beef is still an assumed 60 min (marked `*`) — per-hour only.
 - Mats are valued at **market price** (true opportunity cost); zero one out to
