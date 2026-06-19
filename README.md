@@ -19,12 +19,13 @@ Open `index.html` in a browser (or `python3 -m http.server` in this folder). The
   gathering path is cheapest) — including a **good-to-buy** read on each input, a
   **sell-now** read on the output, and a **yest-vs-fair** column/line showing which
   recent price move is driving the craft (an input below fair = cheaper lately).
+  **Click any material** in the breakdown to open its own price detail (same read).
 - **Prices** are editable. Set a mat's price toward 0 to model farming it yourself.
-- **Price watch** (bottom of the page) flags items whose yesterday's avg or live spot
-  is ≥15% off the fair (robust) price, and judges whether the **current spot is a good
-  buy/sell** (cheap is good for mats you buy, pricey is good for outputs you sell) plus
-  where it sits in the 14-day range — with fair, yesterday's avg, live spot, and the
-  full history (today → oldest).
+- **Price watch** (bottom of the page), split into **craftable outputs** (you sell) and
+  **materials** (you buy), flags items whose yesterday's avg or live spot is ≥15% off the
+  fair (robust) price, judges whether the **current spot is a good buy/sell**, and shows
+  where it sits in the 14-day range — with fair, yesterday's avg, live spot, and the full
+  history (today → oldest).
 
 ## Live price sync (optional)
 

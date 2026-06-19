@@ -54,6 +54,8 @@ button:hover{filter:brightness(1.08)}
 .toprow{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
 .toprow .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-right:4px}
 tr.click{cursor:pointer}
+.mlink{cursor:pointer;border-bottom:1px dotted var(--dim)}
+.mlink:hover{color:var(--accent);border-color:var(--accent)}
 tr.click:hover{background:var(--panel2)}
 tr.sel{background:#22304a}
 th.so{cursor:pointer}th.so:hover{color:var(--text)}
@@ -160,9 +162,10 @@ details.prices summary{cursor:pointer;font-size:11px;text-transform:uppercase;le
   <div class='panel'><table id='table'></table></div>
 
   <div id='breakdown'></div>
+  <div id='matdetail'></div>
 
   <h2>Price watch &mdash; recent movers</h2>
-  <div class='note' style='margin:-4px 0 8px'>Items above ~50g whose <b>yesterday's average</b> (last completed day) or <b>live spot</b> sits &ge;15% off the fair (robust) price. <b>Is spot a good price?</b> judges the current spot against fair from your side of the trade &mdash; cheap is good for mats you buy, pricey is good for outputs you sell &mdash; and shows where spot falls in the 14-day range. History runs today &rarr; oldest (today's live value dimmed &amp; excluded from fair).</div>
+  <div class='note' style='margin:-4px 0 8px'>Split into <b>craftable outputs</b> (you sell) and <b>materials</b> (you buy) &mdash; items above ~50g whose <b>yesterday's average</b> or <b>live spot</b> sits &ge;15% off the fair (robust) price. The deal column judges the spot from your side of the trade (pricey = good to sell, cheap = good to buy) and shows where spot falls in the 14-day range. History runs today &rarr; oldest (today's live value dimmed, excluded from fair).</div>
   <div class='panel' id='watch' style='overflow-x:auto'></div>
 
   <details class='method'>
@@ -305,23 +308,31 @@ function dealInfo(slug){
   const rb=pct==null?'':(pct<0?'below 14d low':pct>100?'above 14d high':pct<=25?'near 14d low':pct>=75?'near 14d high':'mid 14d range');
   return {fair,yest,spot,yestGap,spotGap,pct,isOut,verdict,cls,mark,rb};
 }
+function watchRow(name, di, hist){
+  const FLAG=0.15;
+  const yg=`<span style='color:var(${Math.abs(di.yestGap)>=FLAG?(di.yestGap>0?'--high':'--low'):'--dim'})'>${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}%</span>`;
+  const deal=`<span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}% vs fair${di.rb?', '+di.rb:''})</span>`;
+  const series=hist.map((v,i)=> i===0?`<span class='dim' title='today (live, excluded from fair)'>${g(v)}</span>`:g(v)).join('  ');
+  return `<tr><td>${name}</td><td class='num'>${g(di.fair)}</td><td class='num'>${g(di.yest)}</td><td class='num dim'>${g(di.spot)}</td><td class='num'>${yg}</td><td>${deal}</td><td class='mono' style='font-size:11px;white-space:nowrap'>${series}</td></tr>`;
+}
+function watchTable(rows, dealHdr){
+  let h=`<table><tr><th>Item</th><th class='num'>Fair</th><th class='num'>Yesterday</th><th class='num'>Spot</th><th class='num'>Yest vs fair</th><th>${dealHdr}</th><th>14-day history (today &rarr; oldest)</th></tr>`;
+  for(const r of rows) h+=watchRow(r.name, r.di, r.hist);
+  return h+'</table>';
+}
 function renderWatch(){
-  const FLAG=0.15, MINVAL=50, out=[];
+  const FLAG=0.15, MINVAL=50, crafts=[], mats=[];
   for(const id in ITEMS){
     const sl=ITEMS[id].slug, d=SNAP[sl]; if(!d) continue;
     const di=dealInfo(sl); if(di.fair<MINVAL) continue;     // skip sub-50g items: noisy %, negligible gold
     if(Math.abs(di.yestGap)<FLAG && Math.abs(di.spotGap)<FLAG) continue;
-    out.push({name:ITEMS[id].name, hist:d.h||[], di, sig:Math.max(Math.abs(di.yestGap),Math.abs(di.spotGap))});
+    (di.isOut?crafts:mats).push({name:ITEMS[id].name, hist:d.h||[], di, sig:Math.max(Math.abs(di.yestGap),Math.abs(di.spotGap))});
   }
-  out.sort((a,b)=>b.sig-a.sig);
-  if(!out.length){ $('watch').innerHTML="<div class='note' style='margin:0'>Quiet market &mdash; every item over ~50g has its yesterday-avg and live spot within 15% of fair.</div>"; return; }
-  let h="<table><tr><th>Item</th><th class='num'>Fair</th><th class='num'>Yesterday</th><th class='num'>Spot</th><th class='num'>Yest vs fair</th><th>Is spot a good price?</th><th>14-day history (today &rarr; oldest)</th></tr>";
-  for(const r of out){ const di=r.di;
-    const yg=`<span style='color:var(${Math.abs(di.yestGap)>=FLAG?(di.yestGap>0?'--high':'--low'):'--dim'})'>${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}%</span>`;
-    const deal=`<span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}% vs fair${di.rb?', '+di.rb:''})</span>`;
-    const series=r.hist.map((v,i)=> i===0?`<span class='dim' title='today (live, excluded from fair)'>${g(v)}</span>`:g(v)).join('  ');
-    h+=`<tr><td>${r.name}</td><td class='num'>${g(di.fair)}</td><td class='num'>${g(di.yest)}</td><td class='num dim'>${g(di.spot)}</td><td class='num'>${yg}</td><td>${deal}</td><td class='mono' style='font-size:11px;white-space:nowrap'>${series}</td></tr>`;
-  }
+  crafts.sort((a,b)=>b.sig-a.sig); mats.sort((a,b)=>b.sig-a.sig);
+  let h=`<div class='subh' style='margin-top:0'>Craftable outputs &mdash; you sell (${crafts.length})</div>`;
+  h+= crafts.length ? watchTable(crafts,'Good to sell?') : "<div class='note' style='margin:0 0 6px'>No craftable output is &ge;15% off fair right now.</div>";
+  h+=`<div class='subh'>Materials &mdash; inputs you buy (${mats.length})</div>`;
+  h+= mats.length ? watchTable(mats,'Good to buy?') : "<div class='note' style='margin:0'>No material is &ge;15% off fair right now.</div>";
   $('watch').innerHTML=h;
 }
 
@@ -363,7 +374,21 @@ function renderTable(rows){
   $('table').innerHTML=head+body;
 }
 
-function selectRow(id){ selId=(selId===id?null:id); recalc(); if(selId) $('breakdown').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function selectRow(id){ selId=(selId===id?null:id); const md=$('matdetail'); if(md) md.innerHTML=''; recalc(); if(selId) $('breakdown').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+// clicking a material in a breakdown opens its own price detail (same read as the price watch)
+function showMatDetail(id){
+  const m=ITEMS[id]; if(!m) return;
+  const di=dealInfo(m.slug), hh=(SNAP[m.slug]||{}).h||[];
+  const ygc=`color:var(${Math.abs(di.yestGap)>=0.08?(di.yestGap>0?'--high':'--low'):'--dim'})`;
+  let h=`<h2>${m.name} &mdash; price detail</h2><div class='panel'><table>`;
+  h+=`<tr><td>Fair (robust &mdash; used in calcs)</td><td class='num'><b>${g(di.fair)}</b>${m.bundle>1?` <span class='dim'>(${u2(di.fair/m.bundle)}/unit)</span>`:''}</td></tr>`;
+  h+=`<tr><td>Yesterday (last completed day)</td><td class='num'>${g(di.yest)} <span style='${ygc}'>(${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}% vs fair)</span></td></tr>`;
+  h+=`<tr><td>Spot (live lowest)</td><td class='num'>${g(di.spot)} &middot; <span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}% vs fair${di.rb?', '+di.rb:''})</span></td></tr>`;
+  h+=`</table><div class='subh'>14-day history (today &rarr; oldest)</div>`;
+  h+=`<div class='mono' style='font-size:12px;white-space:nowrap;overflow-x:auto'>${hh.map((v,i)=> i===0?`<span class='dim' title='today (live, excluded from fair)'>${g(v)}</span>`:g(v)).join('   ')}</div>`;
+  h+=`<div class='note'>Same read as the price watch &mdash; fair is the robust price used in the calculator; yesterday-vs-fair is the recent move; the spot verdict says whether buying now is good.</div></div>`;
+  $('matdetail').innerHTML=h; $('matdetail').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 function renderBreakdown(id){
   const r=RECIPES.find(x=>x.id===id); if(!r){ $('breakdown').innerHTML=''; return; }
   const e=evalRecipe(r,PRICES,P.R,P.enable), bo=bestOption(r,PRICES);
@@ -380,7 +405,7 @@ function renderBreakdown(id){
     const up=unitPrice(it.id,PRICES), di=dealInfo(ITEMS[it.id].slug);
     const ann=(di.fair && di.cls!=='dim') ? ` <span class='${di.cls}' style='font-size:11px' title='spot ${g(di.spot)} vs fair ${g(di.fair)}${di.rb?' · '+di.rb:''}'>${di.mark} ${di.verdict} ${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}%</span>` : '';
     const yvf=`<span style='color:var(${Math.abs(di.yestGap)>=0.08?(di.yestGap>0?'--high':'--low'):'--dim'})' title='yesterday ${g(di.yest)} vs fair ${g(di.fair)}'>${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}%</span>`;
-    h+=`<tr><td>${ITEMS[it.id].name}${ann}</td><td class='num'>${it.quantity}</td><td class='num dim'>${u2(up)}</td><td class='num'>${g(it.quantity*up)}</td><td class='num'>${yvf}</td></tr>`;
+    h+=`<tr><td><span class='mlink' onclick='showMatDetail("${it.id}")'>${ITEMS[it.id].name}</span>${ann}</td><td class='num'>${it.quantity}</td><td class='num dim'>${u2(up)}</td><td class='num'>${g(it.quantity*up)}</td><td class='num'>${yvf}</td></tr>`;
   }
   h+=`<tr><td class='dim'>Crafting gold (after cost reduction)</td><td class='num'></td><td class='num'></td><td class='num dim'>${g(e.gold)}</td><td class='num'></td></tr>`;
   h+=`<tr><td><b>Total cost</b></td><td class='num'></td><td class='num'></td><td class='num'><b>${g(e.total)}</b></td><td class='num'></td></tr></table>`;
