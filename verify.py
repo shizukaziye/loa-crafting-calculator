@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Parity guard for the crafting calculator (verified-model pattern).
 
-Reads RECIPES / ITEMS / SNAPSHOT straight out of index.html (single source of
-truth), recomputes every recipe in a Python mirror of the JS engine, and asserts
-the results match reference values captured from the browser. If you edit the
-recipe data or the formula, run this; any drift between the shipped JS and this
-mirror — or against the captured anchors — fails loudly.
+Reads RECIPES / ITEMS from index.html and frozen reference prices from refs.json,
+recomputes every recipe in a Python mirror of the JS engine, and asserts the
+results match reference values captured from the browser. Prices are frozen
+(refs.json) so scheduled price refreshes never make this test fail spuriously —
+it guards the formula + recipe data, not the live market. If you edit the recipe
+data or the formula, run this; any drift fails loudly.
 
     python3 verify.py
 """
@@ -22,7 +23,8 @@ def grab(name):
 
 RECIPES = grab("RECIPES")
 ITEMS   = grab("ITEMS")
-SNAPSHOT= grab("SNAPSHOT")
+# frozen reference prices — decoupled from the live snapshot so scheduled refreshes never break this guard
+FROZEN  = json.loads(pathlib.Path(__file__).with_name("refs.json").read_text())["prices"]
 
 # default reductions = the user's in-game screenshot
 R = {"general":{"cost":7,"time":10,"gs":5}, "battle":{"cost":0,"time":0,"gs":0},
@@ -73,7 +75,7 @@ def close(a,b,eps=0.02): return abs(a-b) <= eps
 fails=0
 print(f"{'recipe':32s} {'region':3s} {'net/craft':>11s} {'net/hr':>10s} {'EY':>7s} {'path':>10s}")
 for region in ("nae","euc"):
-    prices=SNAPSHOT[region]
+    prices=FROZEN[region]
     for r in sorted(RECIPES, key=lambda x:x["id"]):
         e=evaluate(r,prices)
         print(f"{r['id']:32s} {region:3s} {e['net']:11.2f} {e['perHr']:10.2f} {e['EY']:7.3f} {e['path']:>10s}")

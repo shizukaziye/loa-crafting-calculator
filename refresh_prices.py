@@ -36,6 +36,10 @@ for reg in ("nae", "euc"):
     print(f"  {reg}: {len(snap[reg])}/{len(slugs)} prices")
     time.sleep(0.3)
 
+if snap == grab("SNAPSHOT"):
+    print("Prices unchanged since last snapshot — nothing to write.")
+    sys.exit(0)
+
 ts = int(time.time())
 src = re.sub(r'^const SNAPSHOT=.*;\s*$',
              "const SNAPSHOT=" + json.dumps(snap, separators=(',', ':')) + ";", src, count=1, flags=re.M)
