@@ -74,11 +74,14 @@ details.prices{margin-top:12px;background:var(--panel2);border:1px solid var(--b
 details.prices summary{cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;padding:6px 0}
 .ninp{width:62px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:13px}
 .knob{display:inline-flex;align-items:center;gap:6px}
+.spark{display:inline-block;cursor:crosshair}
+#sparktip{position:fixed;display:none;z-index:200;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font:12px/1.6 "SF Mono",Menlo,monospace;color:var(--text);pointer-events:none;max-width:320px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
 #table tr:nth-child(2n) td,#watch tr:nth-child(2n) td{background:rgba(255,255,255,.022)}
 @media(max-width:760px){.redux{grid-template-columns:repeat(2,1fr)}.panel{overflow-x:auto}table{font-size:12px}}
 </style>
 </head><body>
 <div class='wrap'>
+  <div id='sparktip'></div>
   <h1>Lost Ark Stronghold Crafting &mdash; Profit Calculator</h1>
   <div class='tag'>Every stronghold craft ranked by net gold &mdash; per craft, per hour, ROI. Priced at a robust <b>14-day average</b> (not the live spot) so a bought-out market can't distort it. Method &amp; setup in the dropdown at the bottom.</div>
 
@@ -226,17 +229,27 @@ const LS_get=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
 const LS_set=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
 // signed % colored by direction (up=high, down=low, small=dim) — one consistent token
 const moveTag=(f,thr)=>{const c=Math.abs(f)>=(thr||0.08)?(f>0?'--high':'--low'):'--dim';return `<span style='color:var(${c})'>${f>0?'+':''}${Math.round(f*100)}%</span>`;};
-// compact inline sparkline of a price series (newest-first); exact values on hover
+// compact inline sparkline; the wrapping span is the hover target -> custom tooltip shows the values
 function sparkline(h){
   if(!h||h.length<2) return "<span class='dim'>&mdash;</span>";
   const a=h.slice().reverse(), mn=Math.min(...a), mx=Math.max(...a), rng=(mx-mn)||1, W=120,H=22,P=2,n=a.length;
   const X=i=>(P+i/(n-1)*(W-2*P)), Y=v=>(H-P-(v-mn)/rng*(H-2*P));
   const pts=a.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ');
-  return `<svg width='${W}' height='${H}' viewBox='0 0 ${W} ${H}' style='vertical-align:middle'>`
-    +`<title>newest&#8594;oldest: ${h.map(x=>g(x)).join(' / ')}</title>`
+  const vals='today → oldest:   '+h.map(x=>g(x)).join('    ');
+  return `<span class='spark' data-v="${vals}" onmousemove='sparkTip(event)' onmouseleave='sparkTipHide()'>`
+    +`<svg width='${W}' height='${H}' viewBox='0 0 ${W} ${H}' style='vertical-align:middle;pointer-events:none'>`
     +`<polyline points='${pts}' style='fill:none;stroke:var(--accent);stroke-width:1.5'/>`
-    +`<circle cx='${X(n-1).toFixed(1)}' cy='${Y(a[n-1]).toFixed(1)}' r='2.2' style='fill:var(--high)'/></svg>`;
+    +`<circle cx='${X(n-1).toFixed(1)}' cy='${Y(a[n-1]).toFixed(1)}' r='2.2' style='fill:var(--high)'/></svg></span>`;
 }
+function sparkTip(e){
+  const t=$('sparktip'); if(!t) return;
+  t.textContent=e.currentTarget.getAttribute('data-v')||'';
+  t.style.display='block';
+  const w=t.offsetWidth||260;
+  t.style.left=Math.max(6,Math.min(e.clientX+14,(window.innerWidth||900)-w-10))+'px';
+  t.style.top=(e.clientY+16)+'px';
+}
+function sparkTipHide(){ const t=$('sparktip'); if(t) t.style.display='none'; }
 
 // ====== defaults (from the user's reduction screenshot) ======
 const DEFAULTS={
