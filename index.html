@@ -66,6 +66,9 @@ button:hover{filter:brightness(1.08)}
 tr.click{cursor:pointer}
 .mlink{cursor:pointer;border-bottom:1px dotted var(--dim)}
 .mlink:hover{color:var(--accent);border-color:var(--accent)}
+.pathpick{cursor:pointer;color:var(--text);border-bottom:1px dotted var(--dim);white-space:nowrap}
+.pathpick:hover{color:var(--accent);border-color:var(--accent)}
+.pathpick.ov{color:var(--high);border-color:var(--high)}
 tr.click:hover{background:var(--panel2)}
 tr.sel{background:#22304a}
 th.so{cursor:pointer}th.so:hover{color:var(--text)}
@@ -214,7 +217,7 @@ NET / hour = netProfit / (adjustedTime / 60)
 ROI %      = netProfit / totalCost</div>
     <ul>
       <li><b>Great Success</b> doubles a craft's output, and happens <code>GSC%</code> of the time &mdash; that's why expected yield is <code>qty x (1 + GSC/100)</code>. The "x2" badge in-game refers to this doubling. Toggle it off to see worst-case.</li>
-      <li><b>Cheapest path:</b> fusion materials can be made from several gathering types (Fishing / Hunting / Mining...). The tool prices each path and uses the cheapest; the chosen one shows in the Path column.</li>
+      <li><b>Cheapest path &mdash; click to switch:</b> fusion materials can be made from several gathering types (Fishing / Hunting / Mining...). The tool prices each path and uses the <b>cheapest</b> by default; the chosen one shows in the Path column. <b>Click the Path cell</b> to cycle paths, or click a row in a recipe's &ldquo;Gathering paths&rdquo; breakdown to force one &mdash; handy for matching another tool's selected path. Your choice persists; &ldquo;reset to cheapest&rdquo; clears it.</li>
       <li><b>Robust vs spot pricing.</b> Each item carries a current <i>spot</i> (lowest listing) and 14 days of daily average prices. The default <b>robust</b> price <b>excludes the current (live, in-progress) day</b> entirely, then drops the highest &amp; lowest few of the completed days and takes a <i>recency-weighted</i> mean of the rest (newest completed day &times;1, each older &times;<code>decay</code>) &mdash; so it tracks genuine moves but the live spike (or a lowball) can never enter. Tune <b>drop hi/lo</b> and <b>decay</b> live above; the breakdown flags any item whose spot is &ge;15% off its robust price (&#9888;). Toggle <b>Pricing &rarr; Spot</b> for the live lowest price.</li>
       <li><b>Mats are valued at market price</b> (true opportunity cost). If you farm a mat yourself, edit its price toward 0 to see your effective profit.</li>
       <li><b>Two added meals</b> (Virtuoso's Striploin, Specialist's Beef Tenderloin) aren't in loa-buddy. Their recipes are entered from in-game. <span class='warn'>Their craft times are assumed (75 / 60 min) &mdash; confirm them in-game; this only affects the per-hour column, not per-craft.</span></li>
@@ -307,19 +310,26 @@ function gscOf(r,R,enable){ if(!enable) return 0; const x=R.general.gs+(R[r.type
 function taxOf(p){ return p<=1?0:Math.ceil(p*0.05); }
 function unitPrice(id,prices){ const m=ITEMS[id]; return (prices[m.slug]||0)/m.bundle; }
 function optionCost(opt,prices){ let s=0; for(const it of opt.items) s+=it.quantity*unitPrice(it.id,prices); return s; }
-function bestOption(r,prices){ let best=null; for(const o of r.materialOptions){ const c=optionCost(o,prices); if(best===null||c<best.cost) best={cat:o.category,cost:c,opt:o}; } return best; }
+// all gathering paths for a recipe, priced & sorted cheapest-first
+function pathsOf(r,prices){ return r.materialOptions.map(o=>({cat:o.category,cost:optionCost(o,prices),opt:o})).sort((a,b)=>a.cost-b.cost); }
+// chosen path: a manual override (pathOverride) if set & still valid, else the cheapest. auto=true means no override is active.
+function bestOption(r,prices){
+  const ps=pathsOf(r,prices), ov=pathOverride[r.id];
+  const ch=(ov!=null)?ps.find(p=>p.cat===ov):null;
+  return ch?{cat:ch.cat,cost:ch.cost,opt:ch.opt,auto:false}:{cat:ps[0].cat,cost:ps[0].cost,opt:ps[0].opt,auto:true};
+}
 function evalRecipe(r,prices,R,enable){
   const gold=adjGold(r,R), bo=bestOption(r,prices), total=bo.cost+gold;
   const GSC=gscOf(r,R,enable), EY=r.quantity*(1+GSC/100);
   const sell=prices[ITEMS[r.id].slug]||0, tax=taxOf(sell), revenue=EY*(sell-tax);
   const net=revenue-total, time=adjTime(r,R);
-  return { gold, path:bo.cat, matCost:bo.cost, total, GSC, EY, sell, tax, revenue, net,
+  return { gold, path:bo.cat, auto:bo.auto, matCost:bo.cost, total, GSC, EY, sell, tax, revenue, net,
            time, perHr: time>0?net/(time/60):0, roi: total>0?net/total:0 };
 }
 
 // ====== state + lifecycle ======
 let P=null, PRICES={}, SNAP={}, basis='m', decay=0.90, trimEach=2, curRegion='nae', enableGS=true, curFilter='all',
-    sortKey='net', sortDir=-1, selId=null, inputsCollapsed=false;
+    sortKey='net', sortDir=-1, selId=null, inputsCollapsed=false, pathOverride={};
 
 function setDefaultsToInputs(){
   for(const cat of ['general','battle','cooking','special'])
@@ -427,7 +437,7 @@ function renderTable(rows){
     body+=`<tr class='click${selId===r.id?' sel':''}' onclick='selectRow("${r.id}")'>`+
       `<td>${r.name}</td>`+
       `<td><span class='pill ${r.type}'>${TYPE[r.type]}</span></td>`+
-      `<td class='dim'>${e.path==='default'?'—':e.path}</td>`+
+      `<td>${r.materialOptions.length>1?`<span class='pathpick${e.auto?'':' ov'}' title='${e.auto?'Cheapest path — click to switch':'Manually set — click to switch'}' onclick='cyclePath("${r.id}",event)'>${e.path} &#8644;</span>`:`<span class='dim'>${e.path==='default'?'—':e.path}</span>`}</td>`+
       `<td class='num'>${g(e.matCost)}</td>`+
       `<td class='num dim'>${g(e.gold)}</td>`+
       `<td class='num'>${g(e.total)}</td>`+
@@ -441,6 +451,13 @@ function renderTable(rows){
 }
 
 function selectRow(id){ selId=(selId===id?null:id); const md=$('matdetail'); if(md) md.innerHTML=''; recalc(); if(selId) $('breakdown').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+// switch which gathering path a recipe uses (manual override; persists). cat=null clears it (back to cheapest).
+function setPath(id,cat){ if(cat==null) delete pathOverride[id]; else pathOverride[id]=cat; recalc(); }
+function cyclePath(id,ev){ if(ev) ev.stopPropagation();
+  const r=RECIPES.find(x=>x.id===id); if(!r||r.materialOptions.length<2) return;
+  const ps=pathsOf(r,PRICES), i=ps.findIndex(p=>p.cat===bestOption(r,PRICES).cat);
+  setPath(id, ps[(i+1)%ps.length].cat);
+}
 // clicking a material in a breakdown opens its own price detail (same read as the price watch)
 function showMatDetail(id){
   const m=ITEMS[id]; if(!m) return;
@@ -459,9 +476,11 @@ function renderBreakdown(id){
   const e=evalRecipe(r,PRICES,P.R,P.enable), bo=bestOption(r,PRICES);
   let h=`<h2>${r.name} &mdash; breakdown</h2><div class='panel'>`;
   if(r.materialOptions.length>1){
-    h+=`<div class='subh'>Gathering paths (cheapest auto-selected)</div><table><tr><th>Path</th><th class='num'>Material cost</th></tr>`;
-    r.materialOptions.map(o=>({c:o.category,cost:optionCost(o,PRICES)})).sort((a,b)=>a.cost-b.cost)
-      .forEach(o=>{ h+=`<tr><td>${o.c}${o.c===bo.cat?" <span class='accent'>← used</span>":''}</td><td class='num'>${g(o.cost)}</td></tr>`; });
+    const ps=pathsOf(r,PRICES), ov=pathOverride[r.id]!=null;
+    h+=`<div class='subh' style='display:flex;gap:8px;align-items:baseline;flex-wrap:wrap'>Gathering paths <span class='note' style='margin:0;font-weight:400;text-transform:none;letter-spacing:0'>&mdash; click a row to use that path${ov?` &middot; <span class='mlink' onclick='setPath("${r.id}",null)'>reset to cheapest</span>`:' &middot; cheapest auto-selected'}</span></div>`;
+    h+=`<table><tr><th>Path</th><th class='num'>Material cost</th><th class='num'>vs cheapest</th></tr>`;
+    ps.forEach(o=>{ const used=o.cat===bo.cat, extra=o.cost-ps[0].cost;
+      h+=`<tr class='click${used?' sel':''}' onclick='setPath("${r.id}","${o.cat}")'><td>${o.cat}${used?` <span class='accent'>&larr; used${bo.auto?' &middot; cheapest':''}</span>`:''}</td><td class='num'>${g(o.cost)}</td><td class='num dim'>${extra<1?'&mdash;':'+'+g(extra)}</td></tr>`; });
     h+=`</table>`;
   }
   h+=`<div class='subh'>Materials (${bo.cat==='default'?'recipe':bo.cat+' path'})</div>`;
@@ -555,7 +574,7 @@ async function syncPrices(){
 function saveSettings(){
   try{
     const red={}; for(const c of ['general','battle','cooking','special']) for(const k of ['cost','time','gs']) red[c+'_'+k]=$('r_'+c+'_'+k).value;
-    LS_set('loa_settings', JSON.stringify({region:curRegion, basis, decay, trim:trimEach, gs:enableGS, red}));
+    LS_set('loa_settings', JSON.stringify({region:curRegion, basis, decay, trim:trimEach, gs:enableGS, red, paths:pathOverride}));
   }catch(e){}
 }
 function loadSettings(){
@@ -566,6 +585,7 @@ function loadSettings(){
   if(typeof s.decay==='number') decay=s.decay;
   if(typeof s.trim==='number') trimEach=s.trim;
   if(typeof s.gs==='boolean') enableGS=s.gs;
+  if(s.paths && typeof s.paths==='object') pathOverride=s.paths;
   if(s.red) for(const k in s.red){ const el=$('r_'+k); if(el) el.value=s.red[k]; }
   $('p_trim').value=trimEach; $('p_decay').value=decay;
   document.querySelectorAll('[data-rg]').forEach(b=>b.classList.toggle('active',b.dataset.rg===curRegion));
