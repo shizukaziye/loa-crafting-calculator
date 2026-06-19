@@ -235,21 +235,30 @@ function sparkline(h){
   const a=h.slice().reverse(), mn=Math.min(...a), mx=Math.max(...a), rng=(mx-mn)||1, W=120,H=22,P=2,n=a.length;
   const X=i=>(P+i/(n-1)*(W-2*P)), Y=v=>(H-P-(v-mn)/rng*(H-2*P));
   const pts=a.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ');
-  const vals='today → oldest:   '+h.map(x=>g(x)).join('    ');
-  return `<span class='spark' data-v="${vals}" onmousemove='sparkTip(event)' onmouseleave='sparkTipHide()'>`
+  return `<span class='spark' data-h='${h.join(',')}' onmousemove='sparkTip(event)' onmouseleave='sparkTipHide()'>`
     +`<svg width='${W}' height='${H}' viewBox='0 0 ${W} ${H}' style='vertical-align:middle;pointer-events:none'>`
     +`<polyline points='${pts}' style='fill:none;stroke:var(--accent);stroke-width:1.5'/>`
+    +`<circle class='sphi' r='3' style='fill:var(--accent);display:none'/>`
     +`<circle cx='${X(n-1).toFixed(1)}' cy='${Y(a[n-1]).toFixed(1)}' r='2.2' style='fill:var(--high)'/></svg></span>`;
 }
+// hovering a sparkline highlights the day under the cursor and shows that day's price
 function sparkTip(e){
-  const t=$('sparktip'); if(!t) return;
-  t.textContent=e.currentTarget.getAttribute('data-v')||'';
+  const sp=e.currentTarget, t=$('sparktip'); if(!t) return;
+  const h=(sp.getAttribute('data-h')||'').split(',').map(Number); if(h.length<2) return;
+  const a=h.slice().reverse(), n=a.length, mn=Math.min(...a), mx=Math.max(...a), rng=(mx-mn)||1, W=120,H=22,P=2;
+  const rect=sp.getBoundingClientRect();
+  let frac=(e.clientX-rect.left)/(rect.width||W); frac=Math.max(0,Math.min(1,frac));
+  const idx=Math.round(frac*(n-1)), val=a[idx], daysAgo=n-1-idx;
+  const hi=sp.querySelector('.sphi');
+  if(hi){ hi.setAttribute('cx',(P+idx/(n-1)*(W-2*P)).toFixed(1)); hi.setAttribute('cy',(H-P-(val-mn)/rng*(H-2*P)).toFixed(1)); hi.style.display='block'; }
+  const lbl=daysAgo===0?'today (live)':daysAgo===1?'yesterday':daysAgo+' days ago';
+  t.innerHTML=`<b>${lbl}</b> &middot; ${g(val)}g`;
   t.style.display='block';
-  const w=t.offsetWidth||260;
+  const w=t.offsetWidth||110;
   t.style.left=Math.max(6,Math.min(e.clientX+14,(window.innerWidth||900)-w-10))+'px';
   t.style.top=(e.clientY+16)+'px';
 }
-function sparkTipHide(){ const t=$('sparktip'); if(t) t.style.display='none'; }
+function sparkTipHide(){ const t=$('sparktip'); if(t) t.style.display='none'; document.querySelectorAll('.sphi').forEach(c=>c.style.display='none'); }
 
 // ====== defaults (from the user's reduction screenshot) ======
 const DEFAULTS={
@@ -301,6 +310,7 @@ function recalc(){
   renderWatch();
   renderTable(rows);
   if(selId) renderBreakdown(selId);
+  saveSettings();
 }
 
 // ====== render ======
@@ -312,7 +322,7 @@ function renderSummary(rows){
   let h=`<div class='big'>Top profit / craft: <b class='accent'>${r.name}</b> &mdash; <b class='${e.net>=0?'good':'bad'}'>${sg(e.net)} gold</b> per craft `+
         `<span class='dim'>(${sg(e.perHr)}/hr, ${pct(e.roi)} ROI)</span></div>`;
   if(bestHr.r.id!==r.id) h+=`<div class='note'>Best per <b>hour</b>: <b class='accent'>${bestHr.r.name}</b> at <b class='good'>${sg(bestHr.e.perHr)}/hr</b> (${sg(bestHr.e.net)}/craft).</div>`;
-  h+=`<div class='note'>${prof} of ${rows.length} crafts profitable to sell &middot; region <b>${curRegion.toUpperCase()}</b> &middot; <b>${basis==='m'?'robust':'spot'}</b> pricing${P.enable?'':' &middot; great success OFF'}.</div>`;
+  h+=`<div class='note'>${prof} of ${rows.length} profitable to sell &middot; region <b>${curRegion.toUpperCase()}</b> &middot; <b>${basis==='m'?'robust':'spot'}</b> pricing &middot; prices as of ${new Date(SNAP_TS*1000).toLocaleDateString()}${P.enable?'':' &middot; great success OFF'}.</div>`;
   $('summary').innerHTML=h;
 }
 
@@ -507,9 +517,32 @@ async function syncPrices(){
 }
 
 // ====== boot ======
+// remember the user's settings across reloads (prices stay snapshot-driven; only settings persist)
+function saveSettings(){
+  try{
+    const red={}; for(const c of ['general','battle','cooking','special']) for(const k of ['cost','time','gs']) red[c+'_'+k]=$('r_'+c+'_'+k).value;
+    LS_set('loa_settings', JSON.stringify({region:curRegion, basis, decay, trim:trimEach, gs:enableGS, red}));
+  }catch(e){}
+}
+function loadSettings(){
+  let s=null; try{ s=JSON.parse(LS_get('loa_settings')||'null'); }catch(e){}
+  if(!s) return;
+  if(s.region) curRegion=s.region;
+  if(s.basis) basis=s.basis;
+  if(typeof s.decay==='number') decay=s.decay;
+  if(typeof s.trim==='number') trimEach=s.trim;
+  if(typeof s.gs==='boolean') enableGS=s.gs;
+  if(s.red) for(const k in s.red){ const el=$('r_'+k); if(el) el.value=s.red[k]; }
+  $('p_trim').value=trimEach; $('p_decay').value=decay;
+  document.querySelectorAll('[data-rg]').forEach(b=>b.classList.toggle('active',b.dataset.rg===curRegion));
+  document.querySelectorAll('[data-bs]').forEach(b=>b.classList.toggle('active',b.dataset.bs===basis));
+  const gb=$('gsBtn'); if(gb){ gb.classList.toggle('active',enableGS); gb.textContent=enableGS?'On':'Off'; }
+  const hl=decay<1?Math.log(0.5)/Math.log(decay):Infinity, dn=$('decayNote'); if(dn) dn.innerHTML='weight halves '+(isFinite(hl)?'~'+hl.toFixed(1)+' days back':'never');
+}
 function boot(){
   try{
     setDefaultsToInputs();
+    loadSettings();                              // restore saved region/basis/decay/trim/reductions
     const px=LS_get('loa_proxy'); if(px) $('p_proxy').value=px;
     priceFields();
     loadRegion(curRegion); setPriceInputs();
