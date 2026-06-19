@@ -162,7 +162,7 @@ details.prices summary{cursor:pointer;font-size:11px;text-transform:uppercase;le
   <div id='breakdown'></div>
 
   <h2>Price watch &mdash; recent movers</h2>
-  <div class='note' style='margin:-4px 0 8px'>Flags items (above ~50g) <b>trending</b> &ge;20% vs ~10 days ago, or whose <b>yesterday's average</b> (last completed day) is &ge;20% off its fair (robust) price. Shows the full 14-day history (oldest &rarr; today; today's live value is dimmed &amp; excluded from fair). The comparison uses yesterday's avg rather than the volatile live <b>spot</b> &mdash; spot shown for reference.</div>
+  <div class='note' style='margin:-4px 0 8px'>Items above ~50g whose <b>yesterday's average</b> (last completed day) or <b>live spot</b> sits &ge;15% off the fair (robust) price. <b>Is spot a good price?</b> judges the current spot against fair from your side of the trade &mdash; cheap is good for mats you buy, pricey is good for outputs you sell &mdash; and shows where spot falls in the 14-day range. History runs today &rarr; oldest (today's live value dimmed &amp; excluded from fair).</div>
   <div class='panel' id='watch' style='overflow-x:auto'></div>
 
   <details class='method'>
@@ -290,27 +290,30 @@ function renderSummary(rows){
 
 // Price watch: items that are trending, or whose live spot diverges from fair (robust).
 function renderWatch(){
-  const TREND=0.20, GAP=0.20, MINVAL=50, mean=a=>a.reduce((x,y)=>x+y,0)/a.length, out=[];
+  const FLAG=0.15, MINVAL=50, out=[], outputs=new Set(RECIPES.map(r=>ITEMS[r.id].slug));
   for(const id in ITEMS){
     const sl=ITEMS[id].slug, d=SNAP[sl]; if(!d) continue;
     const fair=robustOf(sl), spot=spotOf(sl), hh=d.h||[];
     if(fair<MINVAL) continue;                               // skip sub-50g items: noisy %, negligible gold
-    const yest = hh.length>1 ? hh[1] : (hh[0]??spot);       // yesterday = most recent COMPLETED day (h[0] is today/live)
-    let trend=null;                                         // recent completed (days 1-3) vs ~10d ago (days 7+)
-    if(hh.length>=8){ const rc=hh.slice(1,4), ol=hh.slice(7); if(rc.length&&ol.length&&mean(ol)) trend=(mean(rc)-mean(ol))/mean(ol); }
-    const gap=fair?(yest-fair)/fair:0;                      // comparison uses yesterday's avg, not the live spot
-    if((trend!==null&&Math.abs(trend)>=TREND)||Math.abs(gap)>=GAP)
-      out.push({name:ITEMS[id].name, fair, yest, spot, hist:hh, trend, gap, sig:Math.max(Math.abs(trend||0),Math.abs(gap))});
+    const yest=hh.length>1?hh[1]:(hh[0]??spot);             // yesterday = most recent COMPLETED day (h[0] is today/live)
+    const yestGap=fair?(yest-fair)/fair:0, spotGap=fair?(spot-fair)/fair:0;
+    if(Math.abs(yestGap)<FLAG && Math.abs(spotGap)<FLAG) continue;
+    const comp=hh.slice(1).filter(x=>x>0); let pct=null;    // where spot sits in the completed 14-day range
+    if(comp.length){ const mn=Math.min(...comp), mx=Math.max(...comp); pct=mx>mn?Math.round((spot-mn)/(mx-mn)*100):50; }
+    out.push({name:ITEMS[id].name, fair, yest, spot, hist:hh, yestGap, spotGap, pct, isOut:outputs.has(sl), sig:Math.max(Math.abs(yestGap),Math.abs(spotGap))});
   }
   out.sort((a,b)=>b.sig-a.sig);
-  if(!out.length){ $('watch').innerHTML="<div class='note' style='margin:0'>Quiet market &mdash; no item over ~50g is trending &ge;20% vs ~10 days ago, and every yesterday-avg is within 20% of its fair price.</div>"; return; }
-  let h="<table><tr><th>Item</th><th class='num'>Fair</th><th class='num'>Yesterday</th><th class='num'>Spot</th><th class='num'>Trend</th><th>Yest vs fair</th><th>14-day history (oldest &rarr; today)</th></tr>";
+  if(!out.length){ $('watch').innerHTML="<div class='note' style='margin:0'>Quiet market &mdash; every item over ~50g has its yesterday-avg and live spot within 15% of fair.</div>"; return; }
+  let h="<table><tr><th>Item</th><th class='num'>Fair</th><th class='num'>Yesterday</th><th class='num'>Spot</th><th class='num'>Yest vs fair</th><th>Is spot a good price?</th><th>14-day history (today &rarr; oldest)</th></tr>";
   for(const r of out){
-    const tr=r.trend===null?"<span class='dim'>&mdash;</span>"
-      :`<span style='color:var(${r.trend>=0?'--high':'--low'})'>${r.trend>=0?'▲':'▼'} ${Math.abs(r.trend*100).toFixed(0)}%</span>`;
-    const gp=Math.abs(r.gap)>=GAP?`<span class='warn'>&#9888; ${r.gap>0?'+':''}${Math.round(r.gap*100)}% ${r.gap>0?'high':'low'}</span>`:"<span class='dim'>in line</span>";
-    const series=r.hist.slice().reverse().map((v,i,arr)=> i===arr.length-1 ? `<span class='dim' title='today (live, excluded from fair)'>${g(v)}</span>` : g(v)).join('  ');
-    h+=`<tr><td>${r.name}</td><td class='num'>${g(r.fair)}</td><td class='num'>${g(r.yest)}</td><td class='num dim'>${g(r.spot)}</td><td class='num'>${tr}</td><td>${gp}</td><td class='mono' style='font-size:11px;white-space:nowrap'>${series}</td></tr>`;
+    const yg=`<span style='color:var(${Math.abs(r.yestGap)>=FLAG?(r.yestGap>0?'--high':'--low'):'--dim'})'>${r.yestGap>0?'+':''}${Math.round(r.yestGap*100)}%</span>`;
+    const cheap=r.spotGap<=-0.07, pricey=r.spotGap>=0.07; let verdict, cls;
+    if(r.isOut){ if(pricey){verdict='✓ good to sell';cls='good';} else if(cheap){verdict='✗ weak sell price';cls='bad';} else {verdict='~ fair to sell';cls='dim';} }
+    else       { if(cheap){verdict='✓ good to buy';cls='good';}  else if(pricey){verdict='✗ costly to buy';cls='bad';}  else {verdict='~ fair to buy';cls='dim';} }
+    const rb=r.pct==null?'':(r.pct<0?'below 14d low':r.pct>100?'above 14d high':r.pct<=25?'near 14d low':r.pct>=75?'near 14d high':'mid 14d range');
+    const deal=`<span class='${cls}'>${verdict}</span> <span class='dim'>(${r.spotGap>0?'+':''}${Math.round(r.spotGap*100)}% vs fair${rb?', '+rb:''})</span>`;
+    const series=r.hist.map((v,i)=> i===0?`<span class='dim' title='today (live, excluded from fair)'>${g(v)}</span>`:g(v)).join('  ');
+    h+=`<tr><td>${r.name}</td><td class='num'>${g(r.fair)}</td><td class='num'>${g(r.yest)}</td><td class='num dim'>${g(r.spot)}</td><td class='num'>${yg}</td><td>${deal}</td><td class='mono' style='font-size:11px;white-space:nowrap'>${series}</td></tr>`;
   }
   $('watch').innerHTML=h;
 }
