@@ -63,8 +63,9 @@ python3 verify.py
 ## Notes & caveats
 
 - **Pricing:** every item carries a current *spot* (lowest listing) and **14 days
-  of daily averages**. The default **robust** price drops the highest & lowest few
-  days, then takes a *recency-weighted* mean of the rest (newest day ×1, each older
+  of daily averages**. The default **robust** price **excludes the current (live)
+  day**, then drops the highest & lowest few of the completed days and takes a
+  *recency-weighted* mean of the rest (newest completed day ×1, each older
   day ×`decay`) — so it tracks real moves but a bought-out spike (or a lowball)
   can't sway it. The window/weights are tunable live in the page (**drop hi/lo** and
   **recency decay**; defaults: drop 2 each, decay 0.90 ≈ "halves ~6.6 days back").

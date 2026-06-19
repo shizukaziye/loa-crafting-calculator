@@ -57,7 +57,7 @@ def evaluate(r, prices):
 
 def robust_price(h, te, d):                      # mirror of robustPrice() in index.html
     if not h: return None
-    a=list(h)
+    a = list(h[1:]) if len(h) > 1 else list(h)   # drop the current/live day — completed history only
     if te>0 and len(a)>2*te:
         idx=sorted(range(len(a)), key=lambda i:a[i])
         drop=set(idx[:te])|set(idx[len(idx)-te:])
@@ -83,9 +83,9 @@ ANCHORS = {
 
 # robust-price reference values captured from the shipped JS (trim 2 each side, decay 0.90)
 ROBUST_ANCHORS = {
- ("nae","masters-herb-steak"):1784, ("nae","virtuoso-striploin"):5995, ("nae","specialist-beef"):2173,
- ("nae","abidos-fusion-material"):135, ("nae","fish"):173, ("nae","abidos-solar-carp"):2322,
- ("euc","masters-herb-steak"):2241, ("euc","virtuoso-striploin"):5946, ("euc","fish"):324, ("euc","abidos-solar-carp"):2252,
+ ("nae","masters-herb-steak"):1771, ("nae","virtuoso-striploin"):6013, ("nae","specialist-beef"):2202,
+ ("nae","abidos-fusion-material"):136, ("nae","fish"):175, ("nae","abidos-solar-carp"):2379,
+ ("euc","masters-herb-steak"):2255, ("euc","virtuoso-striploin"):5954, ("euc","fish"):332, ("euc","abidos-solar-carp"):2293,
 }
 
 def close(a,b,eps=0.02): return abs(a-b) <= eps

@@ -177,7 +177,7 @@ ROI %      = netProfit / totalCost</div>
     <ul>
       <li><b>Great Success</b> doubles a craft's output, and happens <code>GSC%</code> of the time &mdash; that's why expected yield is <code>qty x (1 + GSC/100)</code>. The "x2" badge in-game refers to this doubling. Toggle it off to see worst-case.</li>
       <li><b>Cheapest path:</b> fusion materials can be made from several gathering types (Fishing / Hunting / Mining...). The tool prices each path and uses the cheapest; the chosen one shows in the Path column.</li>
-      <li><b>Robust vs spot pricing.</b> Each item carries a current <i>spot</i> (lowest listing) and 14 days of daily average prices. The default <b>robust</b> price drops the highest &amp; lowest few days, then takes a <i>recency-weighted</i> mean of the rest (newest day &times;1, each older day &times;<code>decay</code>) &mdash; so it tracks genuine moves but a bought-out spike (or a lowball) can't sway it. Tune <b>drop hi/lo</b> and <b>decay</b> live above; the breakdown flags any item whose spot is &ge;15% off its robust price (&#9888;). Toggle <b>Pricing &rarr; Spot</b> for live lowest prices.</li>
+      <li><b>Robust vs spot pricing.</b> Each item carries a current <i>spot</i> (lowest listing) and 14 days of daily average prices. The default <b>robust</b> price <b>excludes the current (live, in-progress) day</b> entirely, then drops the highest &amp; lowest few of the completed days and takes a <i>recency-weighted</i> mean of the rest (newest completed day &times;1, each older &times;<code>decay</code>) &mdash; so it tracks genuine moves but the live spike (or a lowball) can never enter. Tune <b>drop hi/lo</b> and <b>decay</b> live above; the breakdown flags any item whose spot is &ge;15% off its robust price (&#9888;). Toggle <b>Pricing &rarr; Spot</b> for the live lowest price.</li>
       <li><b>Mats are valued at market price</b> (true opportunity cost). If you farm a mat yourself, edit its price toward 0 to see your effective profit.</li>
       <li><b>Two added meals</b> (Virtuoso's Striploin, Specialist's Beef Tenderloin) aren't in loa-buddy. Their recipes are entered from in-game. <span class='warn'>Their craft times are assumed (75 / 60 min) &mdash; confirm them in-game; this only affects the per-hour column, not per-craft.</span></li>
       <li><b>Prices</b> come from the same market feed loa-buddy uses, baked in as a snapshot and auto-refreshed every 6 hours by a GitHub Action (both spot &amp; median). In-browser "Sync live prices" (needs a proxy worker) refreshes spot only; the median comes from the scheduled refresh.</li>
@@ -366,7 +366,7 @@ function priceFields(){
 // drop the `te` highest & lowest days, then weight survivors 1, d, d^2, ... by recency.
 function robustPrice(h, te, d){
   if(!h||!h.length) return null;
-  let a=h.slice();
+  let a = h.length>1 ? h.slice(1) : h.slice();   // drop the current/live day — completed history only
   if(te>0 && a.length>2*te){ const idx=a.map((v,i)=>i).sort((x,y)=>a[x]-a[y]);
     const drop=new Set([...idx.slice(0,te),...idx.slice(idx.length-te)]); a=a.filter((v,i)=>!drop.has(i)); }
   let num=0,den=0,w=1; for(const v of a){ num+=v*w; den+=w; w*=d; }
