@@ -2,7 +2,15 @@
 <html lang='en'><head>
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>Lost Ark Crafting Profit Calculator</title>
+<title>Lost Ark Stronghold Crafting — Profit Calculator</title>
+<meta name='description' content='Rank every Lost Ark stronghold craft by net gold per craft, per hour, and ROI. Priced on a robust 14-day market average with a live price watch and per-craft material breakdowns.'>
+<meta property='og:title' content='Lost Ark Stronghold Crafting — Profit Calculator'>
+<meta property='og:description' content='Rank every Lost Ark stronghold craft by net gold per craft, per hour, and ROI — robust 14-day pricing, a price watch, and full material breakdowns.'>
+<meta property='og:type' content='website'>
+<meta property='og:url' content='https://shizukaziye.github.io/loa-crafting-calculator/'>
+<meta name='twitter:card' content='summary'>
+<!-- inline themed favicon: accent-blue mortar bowl + gold pestle (no external file) -->
+<link rel='icon' href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1017'/%3E%3Cpath d='M7 16h18a9 9 0 0 1-18 0z' fill='%2366c7ff'/%3E%3Crect x='5' y='14.5' width='22' height='2.4' rx='1.2' fill='%2366c7ff'/%3E%3Cline x1='20' y1='4' x2='14.5' y2='15' stroke='%23ffb86b' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <!-- SELF-CONTAINED: all CSS + JS inline, no build step, no deps. Deploys to GitHub Pages as-is.
      Engine is a faithful port of loa-buddy.pages.dev's verified profit math, plus two meals it lacks. -->
 <style>
@@ -77,13 +85,31 @@ details.prices summary{cursor:pointer;font-size:11px;text-transform:uppercase;le
 .spark{display:inline-block;cursor:crosshair}
 #sparktip{position:fixed;display:none;z-index:200;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font:12px/1.6 "SF Mono",Menlo,monospace;color:var(--text);pointer-events:none;max-width:320px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
 #table tr:nth-child(2n) td,#watch tr:nth-child(2n) td{background:rgba(255,255,255,.022)}
+.xlink{font-size:12px;color:var(--dim);margin:-8px 0 18px}
+.xlink a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+.xlink a:hover{border-bottom-color:var(--accent)}
+footer{margin:34px 0 0;padding-top:16px;border-top:1px solid var(--border);text-align:center;color:var(--dim);font-size:11.5px;line-height:1.7}
+footer a{color:var(--dim);text-decoration:underline;text-underline-offset:2px}
+footer a:hover{color:var(--accent)}
+footer .fineprint{margin-top:6px;font-size:11px;color:var(--none)}
 @media(max-width:760px){.redux{grid-template-columns:repeat(2,1fr)}.panel{overflow-x:auto}table{font-size:12px}}
+@media(max-width:430px){
+  .wrap{padding:18px 12px 64px}
+  h1{font-size:21px}
+  .inputs{overflow-x:hidden}
+  .toprow{gap:10px 14px}
+  .ig{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+  .redux{grid-template-columns:repeat(2,1fr);gap:8px}
+  .mbtn{padding:6px 10px}
+  th,td{padding:6px 7px}
+}
 </style>
 </head><body>
 <div class='wrap'>
   <div id='sparktip'></div>
   <h1>Lost Ark Stronghold Crafting &mdash; Profit Calculator</h1>
   <div class='tag'>Every stronghold craft ranked by net gold &mdash; per craft, per hour, ROI. Priced at a robust <b>14-day average</b> (not the live spot) so a bought-out market can't distort it. Method &amp; setup in the dropdown at the bottom.</div>
+  <div class='xlink'>Looking to flip on the market instead? Try the <a href='https://shizukaziye.github.io/loa-deal-finder/'>Lost Ark Deal Finder &rarr;</a></div>
 
   <!-- INPUTS: sticky, collapsible, default collapsed -->
   <div class='inputs'>
@@ -207,6 +233,11 @@ export default {
   }
 };</div>
   </details>
+
+  <footer>
+    <div>Market prices via the community feed used by <a href='https://loa-buddy.pages.dev' rel='noopener'>loa-buddy</a>. Also try the <a href='https://shizukaziye.github.io/loa-deal-finder/'>Lost Ark Deal Finder</a>.</div>
+    <div class='fineprint'>Unofficial, fan-made tool. Not affiliated with Smilegate RPG or Amazon Games. Lost Ark is a trademark of its respective owners.</div>
+  </footer>
 </div>
 
 <script>
