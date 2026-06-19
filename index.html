@@ -289,31 +289,38 @@ function renderSummary(rows){
 }
 
 // Price watch: items that are trending, or whose live spot diverges from fair (robust).
+// shared market read for an item slug — used by both the price watch and the breakdown
+function recipeOutputs(){ return recipeOutputs._s || (recipeOutputs._s=new Set(RECIPES.map(r=>ITEMS[r.id].slug))); }
+function dealInfo(slug){
+  const dd=SNAP[slug]||{}, hh=dd.h||[], fair=robustOf(slug), spot=spotOf(slug);
+  const yest=hh.length>1?hh[1]:(hh[0]??spot);               // yesterday = most recent COMPLETED day (h[0] is today/live)
+  const yestGap=fair?(yest-fair)/fair:0, spotGap=fair?(spot-fair)/fair:0;
+  const comp=hh.slice(1).filter(x=>x>0); let pct=null;      // where spot sits in the completed 14-day range
+  if(comp.length){ const mn=Math.min(...comp), mx=Math.max(...comp); pct=mx>mn?Math.round((spot-mn)/(mx-mn)*100):50; }
+  const isOut=recipeOutputs().has(slug), cheap=spotGap<=-0.07, pricey=spotGap>=0.07;
+  let verdict, cls;
+  if(isOut){ if(pricey){verdict='good to sell';cls='good';} else if(cheap){verdict='weak sell price';cls='bad';} else {verdict='fair to sell';cls='dim';} }
+  else      { if(cheap){verdict='good to buy';cls='good';}  else if(pricey){verdict='costly to buy';cls='bad';}  else {verdict='fair to buy';cls='dim';} }
+  const mark=cls==='good'?'✓':cls==='bad'?'✗':'~';
+  const rb=pct==null?'':(pct<0?'below 14d low':pct>100?'above 14d high':pct<=25?'near 14d low':pct>=75?'near 14d high':'mid 14d range');
+  return {fair,yest,spot,yestGap,spotGap,pct,isOut,verdict,cls,mark,rb};
+}
 function renderWatch(){
-  const FLAG=0.15, MINVAL=50, out=[], outputs=new Set(RECIPES.map(r=>ITEMS[r.id].slug));
+  const FLAG=0.15, MINVAL=50, out=[];
   for(const id in ITEMS){
     const sl=ITEMS[id].slug, d=SNAP[sl]; if(!d) continue;
-    const fair=robustOf(sl), spot=spotOf(sl), hh=d.h||[];
-    if(fair<MINVAL) continue;                               // skip sub-50g items: noisy %, negligible gold
-    const yest=hh.length>1?hh[1]:(hh[0]??spot);             // yesterday = most recent COMPLETED day (h[0] is today/live)
-    const yestGap=fair?(yest-fair)/fair:0, spotGap=fair?(spot-fair)/fair:0;
-    if(Math.abs(yestGap)<FLAG && Math.abs(spotGap)<FLAG) continue;
-    const comp=hh.slice(1).filter(x=>x>0); let pct=null;    // where spot sits in the completed 14-day range
-    if(comp.length){ const mn=Math.min(...comp), mx=Math.max(...comp); pct=mx>mn?Math.round((spot-mn)/(mx-mn)*100):50; }
-    out.push({name:ITEMS[id].name, fair, yest, spot, hist:hh, yestGap, spotGap, pct, isOut:outputs.has(sl), sig:Math.max(Math.abs(yestGap),Math.abs(spotGap))});
+    const di=dealInfo(sl); if(di.fair<MINVAL) continue;     // skip sub-50g items: noisy %, negligible gold
+    if(Math.abs(di.yestGap)<FLAG && Math.abs(di.spotGap)<FLAG) continue;
+    out.push({name:ITEMS[id].name, hist:d.h||[], di, sig:Math.max(Math.abs(di.yestGap),Math.abs(di.spotGap))});
   }
   out.sort((a,b)=>b.sig-a.sig);
   if(!out.length){ $('watch').innerHTML="<div class='note' style='margin:0'>Quiet market &mdash; every item over ~50g has its yesterday-avg and live spot within 15% of fair.</div>"; return; }
   let h="<table><tr><th>Item</th><th class='num'>Fair</th><th class='num'>Yesterday</th><th class='num'>Spot</th><th class='num'>Yest vs fair</th><th>Is spot a good price?</th><th>14-day history (today &rarr; oldest)</th></tr>";
-  for(const r of out){
-    const yg=`<span style='color:var(${Math.abs(r.yestGap)>=FLAG?(r.yestGap>0?'--high':'--low'):'--dim'})'>${r.yestGap>0?'+':''}${Math.round(r.yestGap*100)}%</span>`;
-    const cheap=r.spotGap<=-0.07, pricey=r.spotGap>=0.07; let verdict, cls;
-    if(r.isOut){ if(pricey){verdict='✓ good to sell';cls='good';} else if(cheap){verdict='✗ weak sell price';cls='bad';} else {verdict='~ fair to sell';cls='dim';} }
-    else       { if(cheap){verdict='✓ good to buy';cls='good';}  else if(pricey){verdict='✗ costly to buy';cls='bad';}  else {verdict='~ fair to buy';cls='dim';} }
-    const rb=r.pct==null?'':(r.pct<0?'below 14d low':r.pct>100?'above 14d high':r.pct<=25?'near 14d low':r.pct>=75?'near 14d high':'mid 14d range');
-    const deal=`<span class='${cls}'>${verdict}</span> <span class='dim'>(${r.spotGap>0?'+':''}${Math.round(r.spotGap*100)}% vs fair${rb?', '+rb:''})</span>`;
+  for(const r of out){ const di=r.di;
+    const yg=`<span style='color:var(${Math.abs(di.yestGap)>=FLAG?(di.yestGap>0?'--high':'--low'):'--dim'})'>${di.yestGap>0?'+':''}${Math.round(di.yestGap*100)}%</span>`;
+    const deal=`<span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}% vs fair${di.rb?', '+di.rb:''})</span>`;
     const series=r.hist.map((v,i)=> i===0?`<span class='dim' title='today (live, excluded from fair)'>${g(v)}</span>`:g(v)).join('  ');
-    h+=`<tr><td>${r.name}</td><td class='num'>${g(r.fair)}</td><td class='num'>${g(r.yest)}</td><td class='num dim'>${g(r.spot)}</td><td class='num'>${yg}</td><td>${deal}</td><td class='mono' style='font-size:11px;white-space:nowrap'>${series}</td></tr>`;
+    h+=`<tr><td>${r.name}</td><td class='num'>${g(di.fair)}</td><td class='num'>${g(di.yest)}</td><td class='num dim'>${g(di.spot)}</td><td class='num'>${yg}</td><td>${deal}</td><td class='mono' style='font-size:11px;white-space:nowrap'>${series}</td></tr>`;
   }
   $('watch').innerHTML=h;
 }
@@ -370,16 +377,17 @@ function renderBreakdown(id){
   h+=`<div class='subh'>Materials (${bo.cat==='default'?'recipe':bo.cat+' path'})</div>`;
   h+=`<table><tr><th>Material</th><th class='num'>Qty</th><th class='num'>Unit price</th><th class='num'>Line cost</th></tr>`;
   for(const it of bo.opt.items){
-    const up=unitPrice(it.id,PRICES), _sl=ITEMS[it.id].slug, _r=robustOf(_sl), _s=spotOf(_sl);
-    const dev=_r?Math.round((_s-_r)/_r*100):0, fl=Math.abs(dev)>=15?` <span class='warn' title='spot ${dev>0?'+':''}${dev}% vs robust — possible distortion'>&#9888;</span>`:'';
-    h+=`<tr><td>${ITEMS[it.id].name}${fl}</td><td class='num'>${it.quantity}</td><td class='num dim'>${u2(up)}</td><td class='num'>${g(it.quantity*up)}</td></tr>`;
+    const up=unitPrice(it.id,PRICES), di=dealInfo(ITEMS[it.id].slug);
+    const ann=(di.fair && di.cls!=='dim') ? ` <span class='${di.cls}' style='font-size:11px' title='spot ${g(di.spot)} vs fair ${g(di.fair)}${di.rb?' · '+di.rb:''}'>${di.mark} ${di.verdict} ${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}%</span>` : '';
+    h+=`<tr><td>${ITEMS[it.id].name}${ann}</td><td class='num'>${it.quantity}</td><td class='num dim'>${u2(up)}</td><td class='num'>${g(it.quantity*up)}</td></tr>`;
   }
   h+=`<tr><td class='dim'>Crafting gold (after cost reduction)</td><td class='num'></td><td class='num'></td><td class='num dim'>${g(e.gold)}</td></tr>`;
   h+=`<tr><td><b>Total cost</b></td><td class='num'></td><td class='num'></td><td class='num'><b>${g(e.total)}</b></td></tr></table>`;
   h+=`<div class='subh'>Result</div><table>`;
   h+=`<tr><td>Base yield x great-success</td><td class='num'>${r.quantity} x (1+${e.GSC.toFixed(2)}%) = <b>${e.EY.toFixed(3)}</b></td></tr>`;
-  const _sl=ITEMS[r.id].slug, _rb=robustOf(_sl), _sp=spotOf(_sl), _dev=_rb?Math.round((_sp-_rb)/_rb*100):0;
-  h+=`<tr><td>Sell price &mdash; <b>${basis==='m'?'robust':'spot'}</b> basis</td><td class='num'>robust ${g(_rb)} &middot; spot ${g(_sp)}${Math.abs(_dev)>=15?` <span class='warn'>spot ${_dev>0?'+':''}${_dev}% &mdash; ${_dev>0?'inflated':'depressed'}</span>`:''}</td></tr>`;
+  const di=dealInfo(ITEMS[r.id].slug);
+  h+=`<tr><td>Fair (robust) &middot; yesterday &middot; spot</td><td class='num'>${g(di.fair)} &middot; ${g(di.yest)} &middot; ${g(di.spot)}</td></tr>`;
+  h+=`<tr><td>Sell now? &mdash; spot vs fair</td><td class='num'><span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}%${di.rb?', '+di.rb:''})</span></td></tr>`;
   h+=`<tr><td>Sells for (each, after 5% tax)</td><td class='num'>${g(e.sell)} &minus; ${e.tax} = ${g(e.sell-e.tax)}</td></tr>`;
   h+=`<tr><td>Revenue (EY x after-tax)</td><td class='num'>${g(e.revenue)}</td></tr>`;
   h+=`<tr><td><b>Net profit / craft</b></td><td class='num ${e.net>=0?'good':'bad'}'><b>${sg(e.net)}</b></td></tr>`;
