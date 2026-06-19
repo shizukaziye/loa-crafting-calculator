@@ -50,8 +50,11 @@ code,.mono{font-family:"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;font-
 .fld input{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:13px;font-family:inherit;width:100%}
 .fld input:disabled{color:var(--accent);opacity:1;cursor:not-allowed;border-style:dashed}
 .fld input:focus{outline:1px solid var(--accent)}
-.pxcat{grid-column:1/-1;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;margin:8px 0 0;padding-bottom:2px;border-bottom:1px solid var(--border)}
-.pxcat:first-child{margin-top:0}
+.pxgrid{display:flex;flex-wrap:wrap;gap:9px}
+.pxgroup{flex:1 1 210px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);padding:7px 9px 8px}
+.pxgroup.wide{flex-basis:100%}
+.pxgroup .gh{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700;margin-bottom:6px}
+.pxgroup .gf{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px 8px}
 .subh{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:700;margin:12px 0 6px}
 .barrow{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
 button{background:var(--accent);color:#06121f;border:none;border-radius:7px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
@@ -106,6 +109,7 @@ footer .fineprint{margin-top:6px;font-size:11px;color:var(--none)}
   .inputs{overflow-x:hidden}
   .toprow{gap:10px 14px}
   .ig{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+  .pxgroup{flex-basis:100%}
   .redux{grid-template-columns:repeat(2,1fr);gap:8px}
   .mbtn{padding:6px 10px}
   th,td{padding:6px 7px}
@@ -172,9 +176,9 @@ footer .fineprint{margin-top:6px;font-size:11px;color:var(--none)}
         <summary id='pxSummary'>Market prices &amp; live-sync</summary>
         <div class='note' style='margin:2px 0 8px'>Prices are per <b>bundle</b> (gathered mats = per 100, crafted = per 1). Edit any cell to override.</div>
         <div class='subh'>Gathered materials (per 100)</div>
-        <div class='ig' id='pxRaw'></div>
+        <div class='pxgrid' id='pxRaw'></div>
         <div class='subh'>Crafted items &amp; outputs (per 1)</div>
-        <div class='ig' id='pxCraft'></div>
+        <div class='pxgrid' id='pxCraft'></div>
         <div class='subh'>Live-sync proxy (optional)</div>
         <div class='ig' style='grid-template-columns:1fr'>
           <div class='fld'><label>Proxy URL &mdash; paste your CORS worker for in-browser "Sync live prices" (see Methodology). Blank = use the baked snapshot or edit by hand.</label><input id='p_proxy' type='text' placeholder='https://your-worker.workers.dev/v1/prices/latest'></div>
@@ -516,19 +520,39 @@ const GATHER=[['Foraging',/flower/],['Logging',/timber/],['Mining',/iron ore/],[
 function gatherCat(nm){ const n=nm.toLowerCase(); for(const [c,re] of GATHER) if(re.test(n)) return c; return 'Other'; }
 function gatherRank(nm){ const n=nm.toLowerCase();   // tier within a profession: base→uncommon→rare→oreha→abidos
   return /abidos/.test(n)?4:/oreha/.test(n)?3:/strong|sturdy|bright|exotic/.test(n)?2:/heavy|tender|treated|shy|redflesh|rare/.test(n)?1:0; }
+const RMAP={}; RECIPES.forEach(r=>{RMAP[r.id]=r;});                  // id -> recipe (type, craftingCost)
+const CTYPE=[['special','Fusion'],['cooking','Cooking'],['battle','Battle']];   // crafted group order + labels
+// drop words the group header already implies (full name stays in the tooltip)
+function shortName(id){ let n=ITEMS[id].name; const t=RMAP[id]&&RMAP[id].type;
+  if(t==='special') n=n.replace(/ Fusion Material$/,'');
+  else if(t==='cooking') n=n.replace(/ Steak Meal$/,'').replace(/ Meal$/,'');
+  return n; }
+function fldCell(id,disp){ return `<div class='fld'><label title='${ITEMS[id].name.replace(/'/g,'&#39;')}'>${disp||ITEMS[id].name}</label>`+
+  `<input id='px_${ITEMS[id].slug}' type='number' step='1' oninput='editPrice("${ITEMS[id].slug}",this.value)'></div>`; }
+function renderGroups(elId,groups){                                 // one labeled card per group; cards flow & pack
+  $(elId).innerHTML = groups.filter(g=>g.ids.length).map(g=>
+    `<div class='pxgroup${g.ids.length>=7?' wide':''}'><div class='gh'>${g.title}</div><div class='gf'>`+
+    g.ids.map(id=>fldCell(id,g.disp?g.disp(id):null)).join('')+`</div></div>`).join('');
+}
 function priceFields(){
   const raw=[],craft=[];
   for(const id in ITEMS){ (ITEMS[id].bundle>1?raw:craft).push(id); }
-  const cell=id=>`<div class='fld'><label>${ITEMS[id].name}</label>`+
-    `<input id='px_${ITEMS[id].slug}' type='number' step='1' oninput='editPrice("${ITEMS[id].slug}",this.value)'></div>`;
-  const ci=c=>{ const i=GATHER.findIndex(x=>x[0]===c); return i<0?99:i; };   // gathered mats: group by profession, tier-sort inside
-  raw.sort((a,b)=> ci(gatherCat(ITEMS[a].name))-ci(gatherCat(ITEMS[b].name))
-    || gatherRank(ITEMS[a].name)-gatherRank(ITEMS[b].name)
-    || ITEMS[a].name.localeCompare(ITEMS[b].name));
-  let lc=null, html='';                                                       // insert a full-width label when the profession changes
-  for(const id of raw){ const c=gatherCat(ITEMS[id].name); if(c!==lc){ html+=`<div class='pxcat'>${c}</div>`; lc=c; } html+=cell(id); }
-  $('pxRaw').innerHTML  = html;
-  $('pxCraft').innerHTML= craft.sort((a,b)=>ITEMS[a].name.localeCompare(ITEMS[b].name)).map(cell).join('');
+  // gathered: a card per profession, tier-sorted inside (full names)
+  const seen=new Set();
+  const rawGroups=GATHER.map(([cat])=>{ const ids=raw.filter(id=>gatherCat(ITEMS[id].name)===cat)
+      .sort((a,b)=>gatherRank(ITEMS[a].name)-gatherRank(ITEMS[b].name)||ITEMS[a].name.localeCompare(ITEMS[b].name));
+      ids.forEach(id=>seen.add(id)); return {title:cat, ids}; });
+  const otherR=raw.filter(id=>!seen.has(id)); if(otherR.length) rawGroups.push({title:'Other', ids:otherR});
+  renderGroups('pxRaw', rawGroups);
+  // crafted: a card per recipe type; sort by crafting cost, pairing base/Splendid; short labels
+  const strip=n=>n.replace(/^Splendid /,'');
+  const csort=(a,b)=>((RMAP[a]?RMAP[a].craftingCost:0)-(RMAP[b]?RMAP[b].craftingCost:0))
+      || strip(ITEMS[a].name).localeCompare(strip(ITEMS[b].name)) || ITEMS[a].name.localeCompare(ITEMS[b].name);
+  const cseen=new Set();
+  const craftGroups=CTYPE.map(([t,label])=>{ const ids=craft.filter(id=>RMAP[id]&&RMAP[id].type===t).sort(csort);
+      ids.forEach(id=>cseen.add(id)); return {title:label, disp:shortName, ids}; });
+  const otherC=craft.filter(id=>!cseen.has(id)); if(otherC.length) craftGroups.push({title:'Other', disp:shortName, ids:otherC});
+  renderGroups('pxCraft', craftGroups);
 }
 // robust price = trimmed, recency-weighted mean of daily history (newest-first):
 // drop the `te` highest & lowest days, then weight survivors 1, d, d^2, ... by recency.
