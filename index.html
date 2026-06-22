@@ -168,6 +168,7 @@ td.barcell .dv{position:relative;font-variant-numeric:tabular-nums;font-weight:7
           <button class='mbtn active' id='gsBtn' onclick='toggleGS()'>On</button></span>
         <span><span class='lbl'>Pricing</span>
           <button class='mbtn active' data-bs='m' onclick='setBasis("m")'>Robust (14d)</button>
+          <button class='mbtn' data-bs='y' onclick='setBasis("y")'>Yesterday</button>
           <button class='mbtn' data-bs='s' onclick='setBasis("s")'>Spot (now)</button></span>
         <span><button onclick='syncPrices()'>&#8635; Sync live prices</button></span>
       </div>
@@ -257,7 +258,7 @@ ROI %      = netProfit / totalCost</div>
     <ul>
       <li><b>Great Success</b> doubles a craft's output, and happens <code>GSC%</code> of the time &mdash; that's why expected yield is <code>qty x (1 + GSC/100)</code>. The "x2" badge in-game refers to this doubling. Toggle it off to see worst-case.</li>
       <li><b>Cheapest path &mdash; click to switch:</b> fusion materials can be made from several gathering types (Fishing / Hunting / Mining...). The tool prices each path and uses the <b>cheapest</b> by default; the chosen one shows in the Path column. <b>Click the Path cell</b> to cycle paths, or click a row in a recipe's &ldquo;Gathering paths&rdquo; breakdown to force one &mdash; handy for matching another tool's selected path. Your choice persists; &ldquo;reset to cheapest&rdquo; clears it.</li>
-      <li><b>Robust vs spot pricing.</b> Each item carries a current <i>spot</i> (lowest listing) and 14 days of daily average prices. The default <b>robust</b> price <b>excludes the current (live, in-progress) day</b> entirely, then drops the highest &amp; lowest few of the completed days and takes a <i>recency-weighted</i> mean of the rest (newest completed day &times;1, each older &times;<code>decay</code>) &mdash; so it tracks genuine moves but the live spike (or a lowball) can never enter. Tune <b>drop hi/lo</b> and <b>decay</b> live above; the breakdown flags any item whose spot is &ge;15% off its robust price (&#9888;). Toggle <b>Pricing &rarr; Spot</b> for the live lowest price.</li>
+      <li><b>Robust vs spot pricing.</b> Each item carries a current <i>spot</i> (lowest listing) and 14 days of daily average prices. The default <b>robust</b> price <b>excludes the current (live, in-progress) day</b> entirely, then drops the highest &amp; lowest few of the completed days and takes a <i>recency-weighted</i> mean of the rest (newest completed day &times;1, each older &times;<code>decay</code>) &mdash; so it tracks genuine moves but the live spike (or a lowball) can never enter. Tune <b>drop hi/lo</b> and <b>decay</b> live above; the breakdown flags any item whose spot is &ge;15% off its robust price (&#9888;). Toggle <b>Pricing &rarr; Spot</b> for the live lowest price, or <b>Pricing &rarr; Yesterday</b> to value everything at the most recent <i>completed</i> day&rsquo;s average &mdash; more accurate than the robust mean when a market has fallen for many days in a row (the 14-day average then lags above where prices actually are).</li>
       <li><b>Mats are valued at market price</b> (true opportunity cost). If you farm a mat yourself, edit its price toward 0 to see your effective profit.</li>
       <li><b>Two added meals</b> (Virtuoso's Striploin, Specialist's Beef Tenderloin) aren't in loa-buddy. Their recipes are entered from in-game. <span class='warn'>Their craft times are assumed (75 / 60 min) &mdash; confirm them in-game; this only affects the per-hour column, not per-craft.</span></li>
       <li><b>Prices</b> come from the same market feed loa-buddy uses, baked in as a snapshot and auto-refreshed every 6 hours by a GitHub Action (both spot &amp; median). In-browser "Sync live prices" (needs a proxy worker) refreshes spot only; the median comes from the scheduled refresh.</li>
@@ -405,7 +406,7 @@ function renderBadge(){ const u=$('updated'); if(!u) return;
   const stale=(Date.now()/1000-SNAP_TS)>8*3600, reg=curRegion==='nae'?'NA East':'EU Central';
   u.className='badge'+(stale?' stale':'');
   u.title='Price snapshot: '+new Date(SNAP_TS*1000).toLocaleString()+' (your local time) · auto-refreshed every 6h';
-  u.innerHTML=`<span class='dot'></span> Pricing: <b>${basis==='m'?'robust 14-day':'spot (live)'}</b> &middot; ${reg} &middot; updated ${freshness()}${(P&&!P.enable)?` &middot; <span class='warn'>great success off</span>`:''}`;
+  u.innerHTML=`<span class='dot'></span> Pricing: <b>${basis==='m'?'robust 14-day':basis==='y'?'yesterday':'spot (live)'}</b> &middot; ${reg} &middot; updated ${freshness()}${(P&&!P.enable)?` &middot; <span class='warn'>great success off</span>`:''}`;
 }
 function renderSummary(rows){
   const prof=rows.filter(x=>x.e.net>0).length;
@@ -537,7 +538,7 @@ function showMatDetail(id){
   const m=ITEMS[id]; if(!m) return;
   const di=dealInfo(m.slug), hh=(SNAP[m.slug]||{}).h||[];
   let h=`<h2>${m.name} &mdash; price detail</h2><div class='panel'><table>`;
-  h+=`<tr><td>Fair (robust &mdash; used in calcs)</td><td class='num'><b>${g(di.fair)}</b>${m.bundle>1?` <span class='dim'>(${u2(di.fair/m.bundle)}/unit)</span>`:''}</td></tr>`;
+  h+=`<tr><td>Fair (robust 14-day)</td><td class='num'><b>${g(di.fair)}</b>${m.bundle>1?` <span class='dim'>(${u2(di.fair/m.bundle)}/unit)</span>`:''}</td></tr>`;
   h+=`<tr><td>Yesterday (last completed day)</td><td class='num'>${g(di.yest)} ${moveTag(di.yestGap)} vs fair</td></tr>`;
   h+=`<tr><td>Spot (live lowest)</td><td class='num'>${g(di.spot)} &middot; <span class='${di.cls}'>${di.mark} ${di.verdict}</span> <span class='dim'>(${di.spotGap>0?'+':''}${Math.round(di.spotGap*100)}% vs fair${di.rb?', '+di.rb:''})</span></td></tr>`;
   h+=`</table><div class='subh'>14-day trend</div>`;
@@ -567,7 +568,7 @@ function renderBreakdown(id){
   }
   h+=`<tr><td class='dim'>Crafting gold (after cost reduction)</td><td class='num'></td><td class='num'></td><td class='num dim'>${g(e.gold)}</td><td class='num'></td></tr>`;
   h+=`<tr><td><b>Total cost</b></td><td class='num'></td><td class='num'></td><td class='num'><b>${g(e.total)}</b></td><td class='num'></td></tr></table>`;
-  h+=`<div class='note'><b>Yest vs fair</b> = yesterday's avg vs the smoothed fair price (fair is what cost/revenue use). A large value flags a recent move making this craft better or worse than its 2-week norm &mdash; e.g. an input well below fair (cheap lately) or an output above fair (selling high lately).</div>`;
+  h+=`<div class='note'><b>Yest vs fair</b> = yesterday's avg vs the smoothed fair price (cost &amp; revenue use whichever basis you pick under Pricing). A large value flags a recent move making this craft better or worse than its 2-week norm &mdash; e.g. an input well below fair (cheap lately) or an output above fair (selling high lately).</div>`;
   h+=`<div class='subh'>Result</div><table>`;
   h+=`<tr><td>Base yield x great-success</td><td class='num'>${r.quantity} x (1+${e.GSC.toFixed(2)}%) = <b>${e.EY.toFixed(3)}</b></td></tr>`;
   const di=dealInfo(ITEMS[r.id].slug);
@@ -634,12 +635,13 @@ function robustPrice(h, te, d){
 }
 function robustOf(slug){ const dd=SNAP[slug]; return dd?(robustPrice(dd.h,trimEach,decay)??dd.s):0; }
 function spotOf(slug){ const dd=SNAP[slug]; return dd?dd.s:0; }
-function priceAt(slug){ return basis==='s'?spotOf(slug):robustOf(slug); }                // active basis value
+function yestOf(slug){ const dd=SNAP[slug]; if(!dd) return 0; const h=dd.h||[]; return (h.length>1?h[1]:(h[0]??dd.s))||dd.s||0; }  // most recent COMPLETED day's avg
+function priceAt(slug){ return basis==='s'?spotOf(slug):basis==='y'?yestOf(slug):robustOf(slug); }   // active basis value
 function buildPrices(){ PRICES={}; for(const s in SNAP) PRICES[s]=priceAt(s); }          // active flat map
 function loadRegion(region){ curRegion=region; SNAP=JSON.parse(JSON.stringify(SNAPSHOT[region]||{})); buildPrices(); updatePxSummary(); }
 function setPriceInputs(){ for(const id in ITEMS){ const f=$('px_'+ITEMS[id].slug); if(f) f.value=PRICES[ITEMS[id].slug]??0; } }
 function editPrice(slug,v){ PRICES[slug]=+v||0; recalc(); }                             // transient override; resets on region/basis switch
-function updatePxSummary(){ $('pxSummary').innerHTML=`Market prices (editable) &mdash; ${curRegion.toUpperCase()}, <b>${basis==='m'?('robust: drop '+trimEach+' hi/lo, decay '+decay):'spot (now)'}</b> &middot; snapshot ${new Date(SNAP_TS*1000).toLocaleDateString()}`; }
+function updatePxSummary(){ $('pxSummary').innerHTML=`Market prices (editable) &mdash; ${curRegion.toUpperCase()}, <b>${basis==='m'?('robust: drop '+trimEach+' hi/lo, decay '+decay):basis==='y'?"yesterday's avg":'spot (now)'}</b> &middot; snapshot ${new Date(SNAP_TS*1000).toLocaleDateString()}`; }
 
 // ====== toggles ======
 function setRegion(rg){ document.querySelectorAll('[data-rg]').forEach(b=>b.classList.toggle('active',b.dataset.rg===rg));
