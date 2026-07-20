@@ -21,8 +21,8 @@ Open `index.html` in a browser (or `python3 -m http.server` in this folder). The
   recent price move is driving the craft (an input below fair = cheaper lately).
   **Click any material** in the breakdown to open its own price detail (same read).
 - **Prices** are editable. Set a mat's price toward 0 to model farming it yourself.
-- **Sparklines** show each item's 14-day trend; hover one to highlight a specific day and read its price.
-- **Your settings stick** — region, pricing basis, decay/trim, and reductions are remembered across reloads (saved locally; prices stay snapshot-driven).
+- **Sparklines** show each item's 14-day trend; hover one to highlight a day and read its price.
+- **Your settings stick** — the page remembers region, pricing basis, decay/trim, and reductions across reloads (saved locally; prices stay snapshot-driven).
 - **Price watch** (bottom of the page), split into **craftable outputs** (you sell) and
   **materials** (you buy), flags items whose yesterday's avg or live spot is ≥15% off the
   fair (robust) price, judges whether the **current spot is a good buy/sell**, and shows
@@ -93,7 +93,7 @@ python3 verify.py
 ## Deploy to GitHub Pages
 
 **Fastest, no tooling** — since the site is one file:
-1. Create a new public repo on github.com (e.g. `loa-crafting-calculator`).
+1. Create a new public repo on github.com (such as `loa-crafting-calculator`).
 2. "Add file → Upload files", drag in `index.html`, commit.
 3. Settings → Pages → Source: *Deploy from a branch* → `main` / `/ (root)` → Save.
 4. Live at `https://<user>.github.io/loa-crafting-calculator/` in ~1 min.
@@ -107,4 +107,4 @@ gh api -X POST repos/<user>/loa-crafting-calculator/pages -f source.branch=main 
 This repo is already `git init`'d and committed, so you can skip straight to the
 `gh repo create` step once authenticated.
 
-Price data originates from the same community market feed loa-buddy uses.
+Price data comes from the same community market feed loa-buddy uses.
